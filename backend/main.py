@@ -113,12 +113,6 @@ def signup(req: SignupRequest):
     otp_expires = (datetime.utcnow() + __import__('datetime').timedelta(minutes=10)).isoformat()
     name = req.name or email.split("@")[0].replace(".", " ").replace("_", " ").title()
 
-    user_doc = {
-        "_id": str(uuid.uuid4()),
-        "email": email,
-        "name": name,
-        "password_hash": hash_password(req.password),
-        "verified": False,
         "otp": otp,
         "otp_expires": otp_expires,
         "created_at": datetime.utcnow().isoformat(),
@@ -127,9 +121,6 @@ def signup(req: SignupRequest):
     if existing and not existing.get("verified"):
         db["users"].update_one(
             {"email": email},
-            {"$set": {
-                "password_hash": hash_password(req.password),
-                "name": name,
                 "otp": otp,
                 "otp_expires": otp_expires,
             }}
@@ -141,9 +132,6 @@ def signup(req: SignupRequest):
     return {
         "success": True,
         "message": "Verification code sent to your email" if email_sent else "Account created. Check server logs for OTP (SMTP not configured).",
-        "email_sent": email_sent,
-    }
-
 
 @app.post("/api/auth/verify-email")
 def verify_email(req: VerifyEmailRequest):
@@ -155,21 +143,6 @@ def verify_email(req: VerifyEmailRequest):
     if user.get("verified"):
         raise HTTPException(400, "Email is already verified")
 
-    otp_expires = user.get("otp_expires", "")
-    if otp_expires and datetime.utcnow().isoformat() > otp_expires:
-        raise HTTPException(400, "Verification code has expired. Please request a new one.")
-
-    if user.get("otp") != req.otp.strip():
-        raise HTTPException(400, "Invalid verification code")
-
-    db["users"].update_one({"email": email}, {"$set": {"verified": True}, "$unset": {"otp": "", "otp_expires": ""}})
-
-    token = create_access_token({"sub": email, "name": user.get("name", "")})
-    return {
-        "success": True,
-        "token": token,
-        "user": {"email": email, "name": user.get("name", "")},
-    }
 
 
 @app.post("/api/auth/resend-otp")
@@ -226,22 +199,10 @@ def change_password(req: ChangePasswordRequest, request: Request):
         raise HTTPException(401, "Invalid or expired token")
     email = payload.get("sub", "")
     db = _safe_get_db()
-    user = db["users"].find_one({"email": email})
-    if not user:
-        raise HTTPException(404, "User not found")
-    if not verify_password(req.current_password, user.get("password_hash", "")):
-        raise HTTPException(400, "Current password is incorrect")
-    if len(req.new_password) < 8:
         raise HTTPException(400, "New password must be at least 8 characters")
-    new_hash = hash_password(req.new_password)
-    db["users"].update_one(
-        {"email": email},
-        {"$set": {"password_hash": new_hash, "password_changed_at": datetime.utcnow().isoformat()}}
-    )
     return {"success": True, "message": "Password updated successfully"}
 
 
-@app.get("/api/auth/me")
 def get_me(request: Request):
     token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
     if not token:
