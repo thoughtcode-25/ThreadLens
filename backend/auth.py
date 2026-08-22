@@ -4,20 +4,27 @@ import string
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env in backend directory or parent directories
+load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 import bcrypt as _bcrypt
 from jose import JWTError, jwt
 
-# Prefer the dedicated JWT secret, while allowing the managed session secret
-# already present in this workspace to sign tokens without committing secrets.
-JWT_SECRET = os.environ.get("JWT_SECRET") or os.environ.get("SESSION_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
-SMTP_EMAIL = os.environ.get("SMTP_EMAIL", "")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+
+def get_jwt_secret() -> str:
+    return os.environ.get("JWT_SECRET") or os.environ.get("SESSION_SECRET") or "dev-insecure-jwt-secret-key-12345"
+
+
+def get_smtp_credentials() -> tuple[str, str]:
+    return os.environ.get("SMTP_EMAIL", "").strip(), os.environ.get("SMTP_PASSWORD", "").strip()
 
 
 def hash_password(password: str) -> str:
@@ -30,16 +37,17 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=JWT_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=JWT_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(to_encode, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 def decode_token(token: str) -> Optional[dict]:
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except JWTError:
+        return jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+    except Exception:
         return None
+
 
 
 def generate_otp(length: int = 6) -> str:
@@ -47,8 +55,9 @@ def generate_otp(length: int = 6) -> str:
 
 
 def send_verification_email(to_email: str, otp: str, name: str = "") -> bool:
-    if not SMTP_EMAIL or not SMTP_PASSWORD:
-        print("SMTP not configured — OTP:", otp)
+    smtp_email, smtp_password = get_smtp_credentials()
+    if not smtp_email or not smtp_password:
+        print("[AUTH] SMTP not configured — OTP:", otp)
         return False
 
     subject = "Thread Lens — Your Verification Code"
@@ -76,14 +85,15 @@ def send_verification_email(to_email: str, otp: str, name: str = "") -> bool:
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = f"Thread Lens <{SMTP_EMAIL}>"
+        msg["From"] = f"Thread Lens <{smtp_email}>"
         msg["To"] = to_email
         msg.attach(MIMEText(html, "html"))
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            server.sendmail(SMTP_EMAIL, to_email, msg.as_string())
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
+            server.login(smtp_email, smtp_password)
+            server.sendmail(smtp_email, to_email, msg.as_string())
         return True
     except Exception as e:
-        print(f"Email send failed: {e}")
+        print(f"[AUTH] Email send failed: {e}")
         return False
+

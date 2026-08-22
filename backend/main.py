@@ -7,11 +7,17 @@ import threading
 import tempfile
 from datetime import datetime
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env in backend directory or parent directories
+load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
+
 
 
 def get_owner(request: Request) -> str:
@@ -27,6 +33,7 @@ from auth import (
     hash_password, verify_password, create_access_token,
     decode_token, generate_otp, send_verification_email
 )
+from pymongo.errors import PyMongoError, ServerSelectionTimeoutError, ConnectionFailure
 
 app = FastAPI(title="LLM Forensic Investigator API", version="1.0.0")
 
@@ -36,6 +43,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(PyMongoError)
+async def pymongo_exception_handler(request: Request, exc: PyMongoError):
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database connection error. Could not connect to MongoDB server. Please ensure MongoDB is running or configure a valid MONGODB_URI in .env."},
+    )
+
+
+@app.exception_handler(RuntimeError)
+async def runtime_error_handler(request: Request, exc: RuntimeError):
+    if "MONGODB_URI" in str(exc) or "GROQ_API_KEY" in str(exc):
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
 
 
 # ─── Auth ──────────────────────────────────────────────────────────────────────
@@ -60,8 +83,15 @@ class ResendOtpRequest(BaseModel):
     email: str
 
 
+def _safe_get_db():
+    try:
+        return get_db()
+    except Exception as exc:
+        raise HTTPException(503, f"Database is unavailable: {exc}")
+
+
 def _get_auth_user(email: str):
-    db = get_db()
+    db = _safe_get_db()
     return db["users"].find_one({"email": email.strip().lower()})
 
 
@@ -73,8 +103,9 @@ def signup(req: SignupRequest):
     if not req.password or len(req.password) < 8:
         raise HTTPException(400, "Password must be at least 8 characters")
 
-    db = get_db()
+    db = _safe_get_db()
     existing = db["users"].find_one({"email": email})
+
     if existing and existing.get("verified"):
         raise HTTPException(409, "An account with this email already exists")
 
@@ -117,7 +148,7 @@ def signup(req: SignupRequest):
 @app.post("/api/auth/verify-email")
 def verify_email(req: VerifyEmailRequest):
     email = req.email.strip().lower()
-    db = get_db()
+    db = _safe_get_db()
     user = db["users"].find_one({"email": email})
     if not user:
         raise HTTPException(404, "No account found for this email")
@@ -144,7 +175,7 @@ def verify_email(req: VerifyEmailRequest):
 @app.post("/api/auth/resend-otp")
 def resend_otp(req: ResendOtpRequest):
     email = req.email.strip().lower()
-    db = get_db()
+    db = _safe_get_db()
     user = db["users"].find_one({"email": email})
     if not user:
         raise HTTPException(404, "No account found for this email")
@@ -162,7 +193,7 @@ def resend_otp(req: ResendOtpRequest):
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
     email = req.email.strip().lower()
-    db = get_db()
+    db = _safe_get_db()
     user = db["users"].find_one({"email": email})
 
     if not user:
@@ -194,7 +225,7 @@ def change_password(req: ChangePasswordRequest, request: Request):
     if not payload:
         raise HTTPException(401, "Invalid or expired token")
     email = payload.get("sub", "")
-    db = get_db()
+    db = _safe_get_db()
     user = db["users"].find_one({"email": email})
     if not user:
         raise HTTPException(404, "User not found")
@@ -219,11 +250,12 @@ def get_me(request: Request):
     if not payload:
         raise HTTPException(401, "Invalid or expired token")
     email = payload.get("sub", "")
-    db = get_db()
+    db = _safe_get_db()
     user = db["users"].find_one({"email": email}, {"_id": 0, "email": 1, "name": 1, "verified": 1})
     if not user:
         raise HTTPException(404, "User not found")
     return {"user": user}
+
 
 
 # ─── Health ────────────────────────────────────────────────────────────────────
@@ -387,10 +419,11 @@ async def upload_logs(request: Request, file: UploadFile = File(...)):
     # Kick off background thread
     thread = threading.Thread(
         target=_process_file_background,
-        args=(job_id, tmp_path, file.filename, total_bytes),
+        args=(job_id, tmp_path, file.filename, total_bytes, owner),
         daemon=True,
     )
     thread.start()
+
 
     return {"job_id": job_id, "status": "processing"}
 
@@ -635,7 +668,7 @@ def chat(req: ChatRequest):
 
 @app.post("/api/chat/sessions")
 def create_chat_session(body: dict):
-    db = get_db()
+    db = _safe_get_db()
     title = body.get("title", "New Chat")[:80]
     doc = {
         "_id": str(uuid.uuid4()),
@@ -711,7 +744,7 @@ class SessionRequest(BaseModel):
 
 @app.post("/api/session")
 def create_session(req: SessionRequest):
-    db = get_db()
+    db = _safe_get_db()
     doc = {
         "_id": str(uuid.uuid4()),
         "date": req.date or datetime.utcnow().strftime("%Y-%m-%d"),
@@ -745,8 +778,9 @@ def get_sessions():
 
 @app.get("/api/export")
 def export(format: str = Query("json", enum=["json", "csv"]), collection: str = Query("logs", enum=["logs", "alerts"])):
-    db = get_db()
+    db = _safe_get_db()
     docs = list(db[collection].find({}, {"_id": 0}).limit(1000))
+
 
     if format == "json":
         content = json.dumps(docs, indent=2, default=str)
@@ -819,8 +853,8 @@ def stats():
         db = get_db()
         total_logs = db["logs"].count_documents({})
         total_alerts = db["alerts"].count_documents({})
-        unresolved = db["alerts"].count_documents({"resolved": False})
-        high_risk = db["alerts"].count_documents({"risk": "high", "resolved": False})
+        unresolved = db["alerts"].count_documents({"resolved": {"$ne": True}})
+        high_risk = db["alerts"].count_documents({"risk": "high", "resolved": {"$ne": True}})
         last_alert = db["alerts"].find_one({}, sort=[("created_at", -1)])
         last_ts = last_alert.get("timestamp") if last_alert else None
         return {
@@ -868,7 +902,7 @@ _DEMO_IPS = ["45.33.32.156", "203.0.113.50", "185.220.101.34", "91.219.236.222",
 
 @app.post("/api/demo/simulate")
 def demo_simulate():
-    db = get_db()
+    db = _safe_get_db()
     ingested_at = datetime.utcnow().isoformat()
     logs = []
     for i, (event, event_type, status, risk, suspicious) in enumerate(_DEMO_EVENTS):
@@ -921,7 +955,7 @@ def demo_simulate():
 
 @app.delete("/api/admin/clear-all-data")
 def clear_all_data():
-    db = get_db()
+    db = _safe_get_db()
     results = {}
     for col in ["logs", "alerts", "sessions", "chat_sessions"]:
         r = db[col].delete_many({})
@@ -933,3 +967,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("BACKEND_PORT", "8000"))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+

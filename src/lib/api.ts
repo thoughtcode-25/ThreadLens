@@ -30,13 +30,14 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
+    ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...authHeaders(),
       ...options?.headers,
     },
-    ...options,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -71,9 +72,10 @@ export const api = {
     form.append("file", file);
     return request<{ success: boolean; job_id: string }>(
       "/api/upload",
-      { method: "POST", body: form, headers: authHeaders() }
+      { method: "POST", body: form }
     );
   },
+
 
   getUploadStatus: (jobId: string) =>
     request<{

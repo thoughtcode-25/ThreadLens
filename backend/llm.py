@@ -1,14 +1,28 @@
 import os
+import re
 import json
+from dotenv import load_dotenv
 from groq import Groq
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+# Load environment variables from .env in backend directory or parent directories
+load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 _client = None
 
 
+def get_model_name() -> str:
+    return os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b").strip()
+
+
+
+def get_groq_api_key() -> str:
+    return os.environ.get("GROQ_API_KEY", "").strip()
+
+
 def ai_configured() -> bool:
-    return bool(GROQ_API_KEY)
+    return bool(get_groq_api_key())
+
 
 BASE_SYSTEM_PROMPT = (
     "You are an AI cybersecurity analyst assistant integrated into an LLM-Powered "
@@ -97,9 +111,10 @@ def _get_client():
     global _client
     if _client is not None:
         return _client
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY environment variable is not set")
-    _client = Groq(api_key=GROQ_API_KEY)
+    api_key = get_groq_api_key()
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY environment variable is not set. Please set GROQ_API_KEY in your .env file.")
+    _client = Groq(api_key=api_key)
     return _client
 
 
@@ -107,7 +122,7 @@ def _chat(prompt: str, db_context: dict | None = None) -> str:
     client = _get_client()
     system_prompt = _build_system_prompt(db_context)
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model=get_model_name(),
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
@@ -136,12 +151,32 @@ def _chat_with_history(question: str, history: list[dict], db_context: dict | No
     messages.append({"role": "user", "content": question})
 
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model=get_model_name(),
         messages=messages,
         temperature=0.7,
         max_tokens=1500,
     )
     return response.choices[0].message.content.strip()
+
+
+
+def _extract_json(text: str) -> dict:
+    """Extract and parse JSON object from text, even if wrapped in markdown code blocks or surrounding text."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.strip()
+
+    try:
+        return json.loads(text)
+    except Exception:
+        # Try finding the first '{' and matching '}'
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        raise
 
 
 def analyze_event(event_data: dict) -> dict:
@@ -158,13 +193,17 @@ Respond ONLY with a JSON object (no markdown, no code blocks) with exactly these
   "recommended_actions": ["<action 1>", "<action 2>", "<action 3>"]
 }}"""
 
-    text = _chat(prompt).strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-    return json.loads(text)
+    text = _chat(prompt)
+    try:
+        return _extract_json(text)
+    except Exception:
+        return {
+            "explanation": text[:300],
+            "attack_type": event_data.get("event", "Suspicious Activity"),
+            "risk_level": event_data.get("risk", "medium"),
+            "why_dangerous": "Potential unauthorized system access or reconnaissance activity.",
+            "recommended_actions": ["Monitor source IP", "Verify credentials", "Review firewall logs"],
+        }
 
 
 def investigate_sequence(logs: list[dict]) -> dict:
@@ -185,16 +224,23 @@ Respond ONLY with a JSON object (no markdown, no code blocks) with exactly these
   "summary": "<one paragraph summary>"
 }}"""
 
-    text = _chat(prompt).strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-    return json.loads(text)
+    text = _chat(prompt)
+    try:
+        return _extract_json(text)
+    except Exception:
+        return {
+            "attack_flow": text[:300],
+            "root_cause": "Multiple suspicious log anomalies detected in the log stream.",
+            "attacker_intent": "Attempted unauthorized access or reconnaissance.",
+            "affected_systems": ["Internal Network", "Authentication Service"],
+            "severity": "medium",
+            "remediation_steps": ["Isolate suspicious IP addresses", "Enforce MFA", "Review access permissions"],
+            "summary": "Forensic automated scan identified potential anomalous activities in the sequence.",
+        }
 
 
 def chat_with_ai(question: str, history: list[dict] = None, db_context: dict | None = None) -> str:
     if history:
         return _chat_with_history(question, history, db_context)
     return _chat(question, db_context)
+
