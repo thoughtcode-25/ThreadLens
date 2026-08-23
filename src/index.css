@@ -148,12 +148,15 @@
   .scrollbar-cyber::-webkit-scrollbar {
     width: 6px;
   }
+
   .scrollbar-cyber::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
+
   .scrollbar-cyber::-webkit-scrollbar-thumb {
     @apply bg-muted-foreground/20 rounded-full;
   }
+
   .scrollbar-cyber::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/40;
   }
@@ -166,11 +169,23 @@
 }
 
 @keyframes glow-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
 @keyframes scan-line {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100vh);
+  }
 }
