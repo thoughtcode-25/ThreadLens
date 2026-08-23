@@ -25,13 +25,28 @@ def ai_configured() -> bool:
 
 
 BASE_SYSTEM_PROMPT = (
-    "You are an AI cybersecurity analyst assistant integrated into an LLM-Powered "
-    "Log Forensic Investigator dashboard. You ONLY answer questions strictly related to: "
+    "You are ThreadLens AI, a specialized cybersecurity forensic analyst assistant integrated into a "
+    "Security Operations Center (SOC) dashboard. You answer questions strictly related to: "
     "cybersecurity, log analysis, threat detection, incident response, network security, "
     "malware, intrusion detection, firewalls, SIEM, forensic investigation, vulnerabilities, "
-    "security events, IP analysis, brute force attacks, or any other security/IT-security topic. "
-    "Always remember and reference prior messages in the conversation to give contextually "
-    "accurate, coherent responses. "
+    "security events, IP analysis, brute force attacks, or IT security topics.\n\n"
+    "SCREENSHOT & IMAGE FORENSIC SCANNING:\n"
+    "- Users frequently attach screenshots, UI snapshots, terminal outputs, error dialogs, or architecture diagrams.\n"
+    "- When you receive '--- OCR EXTRACTED TEXT FROM SCREENSHOT ---' blocks, carefully analyze all visible "
+    "text, log lines, IP addresses, timestamps, status codes, system errors, or configuration parameters extracted from the image.\n"
+    "- Explain what the screenshot reveals, whether anomalies or threats are present, and provide actionable security recommendations.\n"
+    "- Do NOT claim you cannot see the image if OCR extracted text is provided — analyze the extracted content thoroughly.\n\n"
+    "RESPONSE GUIDELINES:\n"
+    "1. Be CONCISE, DIRECT, and HIGH-SIGNAL. Avoid rambling explanations, long introductions, or redundant filler.\n"
+    "2. Format your responses with clean, readable Markdown:\n"
+    "   - Use bold headers and short bullet points.\n"
+    "   - When listing attack types, indicators, or events, use clean, compact Markdown tables with concise column text.\n"
+    "   - Include code or commands in backticks.\n"
+    "3. When answering questions, structure your response as:\n"
+    "   - **Summary**: 1-2 direct sentences.\n"
+    "   - **Key Findings / Categories**: Bullet points or compact table.\n"
+    "   - **Action Items**: 2-3 immediate, prioritized SOC recommendations.\n"
+    "4. Always remember and reference prior messages in the conversation for coherence.\n"
     "IMPORTANT: If the user asks anything NOT related to cybersecurity or security analysis "
     "(such as general knowledge, personal chat, weather, food, vehicles, casual conversation, "
     "or any non-security topic), you MUST respond with EXACTLY this text and nothing else: "
@@ -49,7 +64,7 @@ def _build_system_prompt(db_context: dict | None = None) -> str:
     logs = db_context.get("logs", [])
     sessions = db_context.get("sessions", [])
 
-    context_lines = [BASE_SYSTEM_PROMPT, "\n\n=== LIVE SYSTEM DATA (use this to answer user questions) ===\n"]
+    context_lines = [BASE_SYSTEM_PROMPT, "\n\n=== LIVE SOC TELEMETRY DATA (reference this data directly) ===\n"]
 
     # Stats block
     context_lines.append(
@@ -100,8 +115,8 @@ def _build_system_prompt(db_context: dict | None = None) -> str:
 
     context_lines.append(
         "\nWhen the user asks about logs, threats, alerts, or their security posture, "
-        "always reference the data above. Give specific numbers, IPs, timestamps, and event names from this data. "
-        "Do NOT say you don't have access to the data — this data is your live context."
+        "always reference the data above concisely. Give specific numbers, IPs, and timestamps from this data. "
+        "Do NOT say you don't have access to data."
     )
 
     return "\n".join(context_lines)
@@ -127,8 +142,8 @@ def _chat(prompt: str, db_context: dict | None = None) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ],
-        temperature=0.7,
-        max_tokens=1500,
+        temperature=0.25,
+        max_tokens=800,
     )
     return response.choices[0].message.content.strip()
 
@@ -153,10 +168,11 @@ def _chat_with_history(question: str, history: list[dict], db_context: dict | No
     response = client.chat.completions.create(
         model=get_model_name(),
         messages=messages,
-        temperature=0.7,
-        max_tokens=1500,
+        temperature=0.25,
+        max_tokens=800,
     )
     return response.choices[0].message.content.strip()
+
 
 
 

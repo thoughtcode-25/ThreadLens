@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Shield, Loader2, AlertCircle, CheckCircle2, Mail } from "lucide-react";
@@ -28,13 +28,56 @@ const VerifyEmail = () => {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
+  const verifyCode = useCallback(async (code: string) => {
+    if (code.length !== 6) return;
+    if (!email) {
+      setError("Email address is missing.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp: code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.detail || "Invalid or expired verification code.");
+        setOtp(["", "", "", "", "", ""]);
+        inputRefs.current[0]?.focus();
+        return;
+      }
+      setAuth(data.token, data.user);
+      setSuccess("Email verified successfully! Redirecting...");
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 500);
+    } catch {
+      setError("Network error. Please try again.");
+      setOtp(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
+    } finally {
+      setLoading(false);
+    }
+  }, [email, navigate, setAuth]);
+
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
     const updated = [...otp];
     updated[index] = value.slice(-1);
     setOtp(updated);
+
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
+    }
+
+    // Automatically verify when all 6 digits are provided
+    if (updated.every((digit) => digit !== "")) {
+      const fullCode = updated.join("");
+      verifyCode(fullCode);
     }
   };
 
@@ -47,35 +90,10 @@ const VerifyEmail = () => {
   const handlePaste = (e: React.ClipboardEvent) => {
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     if (pasted.length === 6) {
-      setOtp(pasted.split(""));
+      const digits = pasted.split("");
+      setOtp(digits);
       inputRefs.current[5]?.focus();
-    }
-  };
-
-  const handleVerify = async () => {
-    const code = otp.join("");
-    if (code.length < 6) { setError("Please enter the 6-digit code."); return; }
-    if (!email) { setError("Email is missing."); return; }
-
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/verify-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp: code }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.detail || "Verification failed.");
-        return;
-      }
-      setAuth(data.token, data.user);
-      navigate("/", { replace: true });
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+      verifyCode(pasted);
     }
   };
 
@@ -158,33 +176,34 @@ const VerifyEmail = () => {
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
+                  disabled={loading}
                   value={digit}
                   onChange={(e) => handleOtpChange(i, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(i, e)}
                   data-testid={`input-otp-${i}`}
-                  className="w-11 h-13 text-center text-xl font-bold cyber-input !px-0 !py-3"
+                  className={`w-11 h-13 text-center text-xl font-bold cyber-input !px-0 !py-3 transition-all ${
+                    loading ? "opacity-60 border-primary/50" : ""
+                  }`}
                   style={{ width: "44px", height: "52px" }}
                 />
               ))}
             </div>
           </div>
 
-          <button
-            onClick={handleVerify}
-            disabled={loading || otp.join("").length < 6}
-            data-testid="button-verify"
-            className="cyber-btn w-full flex items-center justify-center gap-2 !py-3 text-sm font-medium disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
-            {loading ? "Verifying..." : "Verify Email"}
-          </button>
+          {/* Automated Verification Indicator */}
+          {loading && (
+            <div className="flex items-center justify-center gap-2 text-xs font-mono text-primary py-2 animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span>Verifying code automatically...</span>
+            </div>
+          )}
 
-          <div className="text-center">
+          <div className="text-center pt-2">
             <p className="text-xs text-muted-foreground">
               Didn't receive a code?{" "}
               <button
                 onClick={handleResend}
-                disabled={resending || resendCooldown > 0}
+                disabled={resending || resendCooldown > 0 || loading}
                 data-testid="button-resend-otp"
                 className="text-primary hover:underline disabled:opacity-50 disabled:no-underline transition-colors"
               >

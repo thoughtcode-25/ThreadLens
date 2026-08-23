@@ -1,7 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, FileText, Plug, Play, CheckCircle, AlertCircle, Loader2, X, HardDrive } from "lucide-react";
+import { Upload, FileText, Plug, Play, CheckCircle, AlertCircle, Loader2, X, HardDrive, Database, Info, ShieldAlert, Sparkles } from "lucide-react";
 
 interface UploadResult {
   success: boolean;
@@ -31,7 +31,7 @@ function formatBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
-const MAX_SIZE = 10 * 1024 * 1024 * 1024; // 10 GB
+const MAX_SIZE = 10 * 1024 * 1024 * 1024; // 10 GB Software architecture max
 
 const AnalyzeLogs = () => {
   const navigate = useNavigate();
@@ -98,12 +98,12 @@ const AnalyzeLogs = () => {
     setError(null);
     const oversized = newFiles.filter((f) => f.size > MAX_SIZE);
     if (oversized.length) {
-      setError("File too large. Maximum supported size is 10 GB.");
+      setError(`Files exceed the maximum software upload limit of 10 GB: ${oversized.map((f) => f.name).join(", ")}`);
       return;
     }
     const valid = newFiles.filter((f) => /\.(txt|log|csv)$/i.test(f.name));
     if (valid.length < newFiles.length) {
-      setError("Only .txt, .log, .csv files are supported");
+      setError("Some files were skipped. Only .txt, .log, and .csv files are supported.");
     }
     setSelectedFiles((prev) => [...prev, ...valid]);
     setResult(null);
@@ -159,14 +159,29 @@ const AnalyzeLogs = () => {
     xhr.onload = () => {
       if (xhr.status === 200) {
         try {
-          const data = JSON.parse(xhr.responseText);
-          if (data.job_id) {
-            setProcessingJobId(data.job_id);
+          const res = JSON.parse(xhr.responseText);
+          if (res.job_id) {
+            setProcessingJobId(res.job_id);
             setProcessingStatus({ status: "processing", logs_stored: 0 });
+          } else {
+            setUploading(false);
+            setUploadProgress(0);
+            setSelectedFiles([]);
+            navigate("/report", {
+              state: {
+                success: res.success ?? true,
+                logs_parsed: res.logs_parsed ?? 0,
+                threats_detected: res.threats_detected ?? 0,
+                session_id: res.session_id ?? "",
+                file_size_mb: res.file_size_mb ?? 0,
+                truncated: res.truncated ?? false,
+                filename: file.name,
+              },
+            });
           }
         } catch {
           setUploading(false);
-          setError("Unexpected response from server");
+          setError("Failed to parse server response.");
         }
       } else {
         setUploading(false);
@@ -206,9 +221,38 @@ const AnalyzeLogs = () => {
       <div className="space-y-6 max-w-3xl mx-auto">
         <div>
           <h2 className="text-xl font-bold text-foreground">Analyze Logs</h2>
-          <p className="text-sm text-muted-foreground mt-1">Upload log files or connect a source for analysis</p>
+          <p className="text-sm text-muted-foreground mt-1">Upload log files or connect a live data source for forensic analysis</p>
         </div>
 
+        {/* Development Phase & Storage Quota Notice */}
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 shadow-lg backdrop-blur-sm">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+              <Database className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-amber-300 text-sm tracking-wide">
+                  Project Under Development Phase
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono text-[10px] font-semibold border border-amber-500/30">
+                  MongoDB Cloud: 500 MB Quota
+                </span>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                Database storage is currently running on a development sandbox tier (<strong className="text-white">500 MB MongoDB capacity</strong>).
+                The core forensic engine architecture is designed to support high-throughput log ingestion and parsing of up to <strong className="text-cyan-400">10 GB per file</strong> (up to 10 million log entries).
+              </p>
+              <div className="pt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono text-slate-400">
+                <span>• Engine Max Support: <strong className="text-cyan-300">10 GB</strong></span>
+                <span>• Active Cluster Allocation: <strong className="text-amber-300">500 MB</strong></span>
+                <span>• Supported Formats: <strong className="text-slate-200">.txt, .log, .csv, JSON Lines</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Upload Box */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
@@ -230,6 +274,9 @@ const AnalyzeLogs = () => {
           <p className="text-foreground font-medium">Drag & drop log files here</p>
           <p className="text-xs text-muted-foreground mt-1">
             Supports .txt, .log, .csv files up to <span className="text-primary font-semibold">10 GB</span> · up to 10 million log entries
+          </p>
+          <p className="text-[11px] text-amber-400/90 font-mono mt-1">
+            (Development phase active: 500 MB cloud database quota)
           </p>
           <button className="cyber-btn-outline text-xs mt-4 !py-1.5" disabled={isProcessing}>Browse Files</button>
         </div>
@@ -322,14 +369,22 @@ const AnalyzeLogs = () => {
         )}
 
         <div className="glass-panel rounded-xl p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Plug className="w-4 h-4 text-primary" />
-            <p className="text-sm font-medium text-foreground">Connect Source</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Plug className="w-4 h-4 text-primary" />
+              <p className="text-sm font-medium text-foreground">Connect Source</p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+              Dev Mode: 500 MB Cap
+            </span>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Connect an external log agent, syslog stream, or REST endpoint for automated ingestion into the forensic engine.
+          </p>
           <input
             value={endpoint}
             onChange={(e) => setEndpoint(e.target.value)}
-            placeholder="Enter API endpoint or file path..."
+            placeholder="Enter API endpoint, syslog URI, or file path..."
             className="cyber-input w-full text-sm"
             data-testid="input-endpoint"
           />

@@ -337,8 +337,8 @@ function PricingContent() {
                 key={plan.id}
                 className={`relative rounded-2xl flex flex-col transition-all duration-300 ${
                   isHighlighted
-                    ? "bg-gradient-to-b from-[#111836] to-[#0a0f24] border-2 border-primary shadow-2xl shadow-primary/15 scale-[1.02]"
-                    : "bg-[#0b0f20]/90 border border-slate-800 hover:border-slate-700 shadow-xl"
+                    ? "bg-gradient-to-b from-[#1e293b] to-[#172554] border-2 border-primary shadow-2xl shadow-primary/20 scale-[1.02]"
+                    : "bg-[#1e293b] border border-slate-700 hover:border-slate-600 shadow-xl"
                 } p-6 sm:p-8`}
               >
                 {/* Popular / Best value badge */}
@@ -351,7 +351,7 @@ function PricingContent() {
                 )}
 
                 {/* Plan Header */}
-                <div className="border-b border-slate-800/80 pb-6 mb-6">
+                <div className="border-b border-slate-700/80 pb-6 mb-6">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-xl font-bold text-white tracking-tight">{plan.name}</h3>
                     {plan.id === "free" && <Shield className="w-5 h-5 text-slate-400" />}
@@ -359,7 +359,7 @@ function PricingContent() {
                     {plan.id === "yearly" && <Flame className="w-5 h-5 text-amber-400" />}
                   </div>
                   
-                  <p className="mt-2 text-xs text-slate-400 min-h-[32px]">{plan.tagline}</p>
+                  <p className="mt-2 text-xs text-slate-300 min-h-[32px]">{plan.tagline}</p>
 
                   {/* Price display */}
                   <div className="mt-5 flex items-baseline gap-2">
@@ -375,18 +375,18 @@ function PricingContent() {
                       )}
                     </div>
                   </div>
-                  <p className="mt-1 text-[11px] text-slate-500">{plan.price.billingPeriod}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">{plan.price.billingPeriod}</p>
                 </div>
 
                 {/* Usage, Credits & Storage Details Box */}
-                <div className="rounded-xl bg-black/40 border border-slate-800/80 p-4 mb-6 space-y-3">
+                <div className="rounded-xl bg-slate-900/80 border border-slate-700 p-4 mb-6 space-y-3">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
                     <span>Allocated Resources</span>
                     <span className="font-mono text-primary">Live Quota</span>
                   </p>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/50">
+                    <div className="p-2 rounded-lg bg-slate-900 border border-slate-700/80">
                       <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
                         <Cpu className="w-3.5 h-3.5 text-primary" />
                         <span>AI Credits</span>
@@ -394,7 +394,7 @@ function PricingContent() {
                       <p className="font-bold text-slate-100 mt-1 font-mono text-[13px]">{plan.metrics.credits}</p>
                     </div>
 
-                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/50">
+                    <div className="p-2 rounded-lg bg-slate-900 border border-slate-700/80">
                       <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
                         <HardDrive className="w-3.5 h-3.5 text-cyan-400" />
                         <span>Storage</span>
@@ -402,7 +402,7 @@ function PricingContent() {
                       <p className="font-bold text-slate-100 mt-1 font-mono text-[13px]">{plan.metrics.storage}</p>
                     </div>
 
-                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/50">
+                    <div className="p-2 rounded-lg bg-slate-900 border border-slate-700/80">
                       <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
                         <Activity className="w-3.5 h-3.5 text-amber-400" />
                         <span>Daily Intake</span>
@@ -410,7 +410,7 @@ function PricingContent() {
                       <p className="font-bold text-slate-100 mt-1 font-mono text-[13px]">{plan.metrics.usage}</p>
                     </div>
 
-                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/50">
+                    <div className="p-2 rounded-lg bg-slate-900 border border-slate-700/80">
                       <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
                         <Database className="w-3.5 h-3.5 text-emerald-400" />
                         <span>Retention</span>
@@ -419,8 +419,8 @@ function PricingContent() {
                     </div>
                   </div>
 
-                  <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-800/40 leading-snug">
-                    <Info className="w-3 h-3 inline mr-1 text-slate-500" />
+                  <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-700/60 leading-snug">
+                    <Info className="w-3 h-3 inline mr-1 text-slate-400" />
                     {plan.metrics.creditsDetail}
                   </p>
                 </div>
@@ -445,10 +445,10 @@ function PricingContent() {
                   onClick={() => handleSelectPlan(plan)}
                   className={`w-full py-3 px-4 rounded-xl text-xs font-bold tracking-wide transition-all duration-200 flex items-center justify-center gap-2 ${
                     plan.ctaVariant === "gradient"
-                      ? "bg-gradient-to-r from-primary via-indigo-500 to-cyan-500 text-white shadow-lg shadow-primary/30 hover:brightness-110 active:scale-[0.98]"
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 hover:brightness-110 active:scale-[0.98]"
                       : plan.ctaVariant === "primary"
                       ? "bg-primary text-white shadow-md hover:bg-primary/90 active:scale-[0.98]"
-                      : "bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-750 hover:text-white"
+                      : "bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-white"
                   }`}
                 >
                   <span>{plan.ctaText}</span>
@@ -462,14 +462,14 @@ function PricingContent() {
 
       {/* ── INTERACTIVE LIVE USAGE & CREDIT ESTIMATOR ── */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="rounded-2xl bg-gradient-to-b from-[#0e142e] to-[#080c1c] border border-slate-800 p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+        <div className="rounded-2xl bg-[#1e293b] border border-slate-700 p-6 sm:p-10 shadow-2xl relative overflow-hidden">
           
           {/* Subtle glow background */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-6 mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700 pb-6 mb-8">
               <div>
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-indigo-500/20 text-indigo-300 text-[11px] font-semibold mb-2 font-mono">
                   <Sliders className="w-3.5 h-3.5" />
@@ -484,7 +484,7 @@ function PricingContent() {
               </div>
 
               {/* Recommended Badge */}
-              <div className="flex items-center gap-3 bg-black/40 border border-slate-700/80 rounded-xl p-3 px-4 shrink-0">
+              <div className="flex items-center gap-3 bg-slate-900/80 border border-slate-700 rounded-xl p-3 px-4 shrink-0">
                 <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
                   <Sparkles className="w-4 h-4 text-primary" />
                 </div>
@@ -499,7 +499,7 @@ function PricingContent() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               
               {/* Slider 1: Daily Log Lines */}
-              <div className="space-y-3 bg-black/30 p-5 rounded-xl border border-slate-800/60">
+              <div className="space-y-3 bg-slate-900/60 p-5 rounded-xl border border-slate-700">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                     <Activity className="w-4 h-4 text-amber-400" />
@@ -518,7 +518,7 @@ function PricingContent() {
                   onChange={(e) => setDailyLogs(Number(e.target.value))}
                   className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
-                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                   <span>1,000 (Free)</span>
                   <span>250k (Monthly)</span>
                   <span>1,000,000+ (Yearly)</span>
@@ -526,7 +526,7 @@ function PricingContent() {
               </div>
 
               {/* Slider 2: Monthly AI Forensic Queries */}
-              <div className="space-y-3 bg-black/30 p-5 rounded-xl border border-slate-800/60">
+              <div className="space-y-3 bg-slate-900/60 p-5 rounded-xl border border-slate-700">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                     <Cpu className="w-4 h-4 text-primary" />
@@ -545,7 +545,7 @@ function PricingContent() {
                   onChange={(e) => setMonthlyQueries(Number(e.target.value))}
                   className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
-                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                   <span>50 (Free)</span>
                   <span>5,000 (Pro)</span>
                   <span>20,000+ (Enterprise)</span>
@@ -555,8 +555,8 @@ function PricingContent() {
             </div>
 
             {/* Live Calculation Results Matrix */}
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-800/60">
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-3.5">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-700">
+              <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-700 flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
                   <Cpu className="w-5 h-5 text-primary" />
                 </div>
@@ -566,7 +566,7 @@ function PricingContent() {
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-3.5">
+              <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-700 flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0">
                   <HardDrive className="w-5 h-5 text-cyan-400" />
                 </div>
@@ -576,7 +576,7 @@ function PricingContent() {
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-3.5">
+              <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-700 flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-5 h-5 text-emerald-400" />
                 </div>
@@ -600,26 +600,26 @@ function PricingContent() {
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-[#090d1f] shadow-xl">
+        <div className="overflow-x-auto rounded-2xl border border-slate-700 bg-[#111827] shadow-xl">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-900/80">
+              <tr className="border-b border-slate-700 bg-slate-900/90">
                 <th className="p-4 sm:p-5 font-bold text-slate-200 text-sm w-1/3">Feature Category</th>
                 <th className="p-4 sm:p-5 font-bold text-slate-200 text-sm w-1/5">Free Community</th>
-                <th className="p-4 sm:p-5 font-bold text-primary text-sm w-1/5 bg-primary/5">Monthly Pro</th>
+                <th className="p-4 sm:p-5 font-bold text-primary text-sm w-1/5 bg-primary/10">Monthly Pro</th>
                 <th className="p-4 sm:p-5 font-bold text-emerald-400 text-sm w-1/4">Yearly Enterprise</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-700/60">
               {COMPARISON_CATEGORIES.map((category, idx) => (
                 <div key={idx} style={{ display: "contents" }}>
-                  <tr className="bg-slate-950/80">
-                    <td colSpan={4} className="p-3 px-5 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-900/40">
+                  <tr className="bg-slate-900/50">
+                    <td colSpan={4} className="p-3 px-5 text-[11px] font-bold uppercase tracking-wider text-slate-300 bg-slate-900">
                       {category.category}
                     </td>
                   </tr>
                   {category.rows.map((row, rIdx) => (
-                    <tr key={rIdx} className="hover:bg-slate-800/30 transition-colors">
+                    <tr key={rIdx} className="hover:bg-slate-800/40 transition-colors">
                       <td className="p-4 sm:p-4 text-slate-300 font-medium">{row.name}</td>
                       <td className="p-4 sm:p-4 text-slate-400 font-mono">{row.free}</td>
                       <td className="p-4 sm:p-4 text-slate-200 font-mono font-semibold bg-primary/5">{row.monthly}</td>
@@ -636,7 +636,7 @@ function PricingContent() {
       {/* ── FAQ ACCORDION ── */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold mb-3">
             <HelpCircle className="w-3.5 h-3.5 text-primary" />
             <span>Frequently Asked Questions</span>
           </div>
@@ -645,12 +645,12 @@ function PricingContent() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {FAQS.map((faq, i) => (
-            <div key={i} className="p-5 rounded-xl bg-slate-900/50 border border-slate-800 hover:border-slate-700 transition-colors">
+            <div key={i} className="p-5 rounded-xl bg-[#1e293b] border border-slate-700 hover:border-slate-600 transition-colors shadow-md">
               <h4 className="text-sm font-semibold text-white mb-2 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <span>{faq.q}</span>
               </h4>
-              <p className="text-xs text-slate-400 leading-relaxed pl-6">{faq.a}</p>
+              <p className="text-xs text-slate-300 leading-relaxed pl-6">{faq.a}</p>
             </div>
           ))}
         </div>
@@ -658,7 +658,7 @@ function PricingContent() {
 
       {/* ── BOTTOM CTA BANNER ── */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="rounded-2xl bg-gradient-to-r from-primary/20 via-indigo-900/40 to-cyan-900/20 border border-primary/30 p-8 sm:p-12 text-center relative overflow-hidden shadow-2xl">
+        <div className="rounded-2xl bg-gradient-to-r from-blue-900/40 via-slate-900 to-[#1e293b] border border-primary/30 p-8 sm:p-12 text-center relative overflow-hidden shadow-2xl">
           <h3 className="text-2xl sm:text-3xl font-bold text-white">
             Ready to Upgrade Your Threat Investigation?
           </h3>
@@ -687,10 +687,10 @@ function PricingContent() {
       {/* ── INTERACTIVE PLAN SELECTION PREVIEW MODAL ── */}
       {selectedPlanModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-[#0c1126] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+          <div className="w-full max-w-lg bg-[#1e293b] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+            <div className="p-6 border-b border-slate-700 flex items-center justify-between bg-slate-900/80">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
                   <Shield className="w-5 h-5 text-primary" />
@@ -712,7 +712,7 @@ function PricingContent() {
             <div className="p-6 space-y-5">
               
               {/* Presentation mode notice */}
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
+              <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <p className="leading-snug">
                   <strong>Preview Mode Notice:</strong> This pricing interface is configured for presentation and evaluation purposes. No payment gateway or real credit card is required.
@@ -720,24 +720,24 @@ function PricingContent() {
               </div>
 
               {/* Resource Quota Summary */}
-              <div className="rounded-xl bg-black/40 border border-slate-800 p-4 space-y-2.5">
+              <div className="rounded-xl bg-slate-900/80 border border-slate-700 p-4 space-y-2.5">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
                   Included Resource Allocation:
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded bg-slate-900/80 border border-slate-800">
+                  <div className="p-2.5 rounded bg-slate-900 border border-slate-700/80">
                     <span className="text-[10px] text-slate-400">AI Credits:</span>
                     <p className="font-bold text-white font-mono">{selectedPlanModal.metrics.credits}</p>
                   </div>
-                  <div className="p-2.5 rounded bg-slate-900/80 border border-slate-800">
+                  <div className="p-2.5 rounded bg-slate-900 border border-slate-700/80">
                     <span className="text-[10px] text-slate-400">Storage Buffer:</span>
                     <p className="font-bold text-white font-mono">{selectedPlanModal.metrics.storage}</p>
                   </div>
-                  <div className="p-2.5 rounded bg-slate-900/80 border border-slate-800">
+                  <div className="p-2.5 rounded bg-slate-900 border border-slate-700/80">
                     <span className="text-[10px] text-slate-400">Daily Ingestion:</span>
                     <p className="font-bold text-white font-mono">{selectedPlanModal.metrics.usage}</p>
                   </div>
-                  <div className="p-2.5 rounded bg-slate-900/80 border border-slate-800">
+                  <div className="p-2.5 rounded bg-slate-900 border border-slate-700/80">
                     <span className="text-[10px] text-slate-400">Retention:</span>
                     <p className="font-bold text-white font-mono">{selectedPlanModal.metrics.retention}</p>
                   </div>
@@ -745,7 +745,7 @@ function PricingContent() {
               </div>
 
               {/* Pricing breakdown */}
-              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800 text-slate-300">
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700 text-slate-300">
                 <span>Calculated Amount:</span>
                 <span className="text-lg font-bold text-white font-mono">
                   ${selectedPlanModal.price.monthly} <span className="text-xs text-slate-400 font-normal">/ mo</span>
@@ -754,7 +754,7 @@ function PricingContent() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 px-6 bg-slate-900/60 border-t border-slate-800 flex items-center justify-end gap-3">
+            <div className="p-4 px-6 bg-slate-900/80 border-t border-slate-700 flex items-center justify-end gap-3">
               <button
                 onClick={() => setSelectedPlanModal(null)}
                 className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-colors"
@@ -792,14 +792,14 @@ export default function PricingPage() {
 
   // If user is unauthenticated, render with top navigation and full landing page theme
   return (
-    <div className="min-h-screen bg-[#070913] text-slate-100 font-sans selection:bg-primary/30 selection:text-primary relative">
+    <div className="min-h-screen bg-[#0f172a] text-slate-100 font-sans selection:bg-primary/30 selection:text-primary relative">
       
       {/* Top Simple Sticky Navbar for standalone view */}
-      <header className="sticky top-0 z-40 bg-[#070913]/90 backdrop-blur-md border-b border-slate-800/80 py-3.5">
+      <header className="sticky top-0 z-40 bg-[#131c2e]/95 backdrop-blur-md border-b border-slate-800 py-3.5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary via-indigo-500 to-cyan-500 p-[1.5px] shadow-lg shadow-primary/20 flex items-center justify-center">
-              <div className="w-full h-full bg-[#070913] rounded-[10px] flex items-center justify-center">
+              <div className="w-full h-full bg-[#0f172a] rounded-[10px] flex items-center justify-center">
                 <Shield className="w-4 h-4 text-primary group-hover:scale-105 transition-transform" />
               </div>
             </div>
@@ -824,9 +824,10 @@ export default function PricingPage() {
         <PricingContent />
       </main>
 
-      <footer className="border-t border-slate-900 bg-[#04060c] py-8 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-800 bg-[#0b1120] py-8 text-center text-xs text-slate-400">
         <p>© 2026 ThreadLens • AI-Powered Security Forensics • Presentation Mode</p>
       </footer>
     </div>
   );
 }
+

@@ -108,7 +108,7 @@ export const api = {
     }>("/api/investigate", { method: "POST", body: JSON.stringify({ logs }) }),
 
   chat: (message: string, history?: { role: string; content: string }[], session_id?: string) =>
-    request<{ success: boolean; off_topic: boolean; response: string; timestamp: string }>("/api/chat", {
+    request<{ success: boolean; off_topic: boolean; response: string; timestamp: string; session_id?: string }>("/api/chat", {
       method: "POST",
       body: JSON.stringify({ message, history, session_id }),
     }),

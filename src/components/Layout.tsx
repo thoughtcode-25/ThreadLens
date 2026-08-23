@@ -17,14 +17,15 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   return (
-    <div className="min-h-screen flex w-full dark relative z-10">
+    <div className="h-screen w-full flex overflow-hidden dark relative z-10">
       <AppSidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <TopNavbar threatDetected={threatDetected} />
-        <main className="flex-1 overflow-auto p-6 scrollbar-cyber">
+        <main className="flex-1 overflow-y-auto p-6 scrollbar-cyber">
           {children}
         </main>
       </div>
     </div>
   );
 }
+
