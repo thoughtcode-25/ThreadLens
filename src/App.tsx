@@ -15,6 +15,8 @@ import LiveMonitoring from "./pages/LiveMonitoring.tsx";
 import AnalyzeLogs from "./pages/AnalyzeLogs.tsx";
 import HistoryPage from "./pages/HistoryPage.tsx";
 import AskAi from "./pages/AskAi.tsx";
+import ToolsPage from "./pages/ToolsPage.tsx";
+import UpcomingFeaturesPage from "./pages/UpcomingFeaturesPage.tsx";
 import SettingsPage from "./pages/SettingsPage.tsx";
 import ProfilePage from "./pages/ProfilePage.tsx";
 import ReportPage from "./pages/ReportPage.tsx";
@@ -44,6 +46,8 @@ function AppRoutes() {
       <Route path="/monitoring" element={<PrivateRoute><LiveMonitoring /></PrivateRoute>} />
       <Route path="/analyze" element={<PrivateRoute><AnalyzeLogs /></PrivateRoute>} />
       <Route path="/report" element={<PrivateRoute><ReportPage /></PrivateRoute>} />
+      <Route path="/tools" element={<PrivateRoute><ToolsPage /></PrivateRoute>} />
+      <Route path="/upcoming" element={<PrivateRoute><UpcomingFeaturesPage /></PrivateRoute>} />
       <Route path="/history" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
       <Route path="/ask-ai" element={<PrivateRoute><AskAi /></PrivateRoute>} />
       <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />

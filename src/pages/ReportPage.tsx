@@ -5,6 +5,7 @@ import {
   CheckCircle,
   AlertTriangle,
   ShieldAlert,
+  ShieldOff,
   FileText,
   Brain,
   ChevronRight,
@@ -22,6 +23,7 @@ import { api, type Alert } from "@/lib/api";
 import { ReportGraphs } from "@/components/report/ReportGraphs";
 import { exportReportToPdf, exportReportToJpeg, exportReportToTxt } from "@/lib/reportExport";
 import { useToast } from "@/hooks/use-toast";
+import { BlockIpModal, type ThreatIpInfo } from "@/components/modals/BlockIpModal";
 
 interface ReportState {
   logs_parsed: number;
@@ -40,6 +42,27 @@ const ReportPage = () => {
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [exporting, setExporting] = useState<"pdf" | "jpeg" | "txt" | null>(null);
+  const [modalThreat, setModalThreat] = useState<ThreatIpInfo | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openBlockModal = (alert: Alert) => {
+    if (!alert.source) return;
+    setModalThreat({
+      ip: alert.source,
+      threatType: alert.title || alert.type,
+      risk: alert.risk,
+      sourceEvent: alert.description,
+      alertId: alert.id,
+      timestamp: alert.timestamp,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleBlockSuccess = (blockedIp: string) => {
+    setAlerts((prev) =>
+      prev.map((a) => (a.source === blockedIp ? { ...a, resolved: true } : a))
+    );
+  };
 
   useEffect(() => {
     api.getAlerts()
@@ -278,7 +301,19 @@ const ReportPage = () => {
                     >
                       {a.risk}
                     </span>
-                    <span className="text-xs text-muted-foreground shrink-0 font-mono">{a.source}</span>
+                    {a.source && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-accent shrink-0 font-mono">{a.source}</span>
+                        <button
+                          onClick={() => openBlockModal(a)}
+                          disabled={a.resolved}
+                          className="px-2 py-0.5 rounded text-[10px] font-semibold bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 transition-colors flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <ShieldOff className="w-3 h-3" />
+                          {a.resolved ? "Blocked" : "Block IP"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {alerts.length > 10 && (
@@ -289,6 +324,14 @@ const ReportPage = () => {
               </div>
             </div>
           )}
+
+          {/* Threat / Spam IP Confirmation Modal */}
+          <BlockIpModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            threat={modalThreat}
+            onSuccess={handleBlockSuccess}
+          />
         </div>
 
         {/* Ask AI Banner / Action Card */}

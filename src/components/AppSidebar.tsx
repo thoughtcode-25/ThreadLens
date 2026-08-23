@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Home, LayoutDashboard, Activity, Search, History, Bot,
   Settings, Shield, LogOut, User, ChevronUp, Lock, Unlock, Pin, PinOff,
-  Sparkles, CreditCard,
+  Sparkles, CreditCard, Wrench, Rocket,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +38,7 @@ const navGroups: NavGroup[] = [
     icon: Bot,
     items: [
       { title: "Ask AI", url: "/ask-ai", icon: Bot },
+      { title: "Tools", url: "/tools", icon: Wrench },
       { title: "History", url: "/history", icon: History },
     ],
   },
@@ -46,6 +47,7 @@ const navGroups: NavGroup[] = [
     icon: LayoutDashboard,
     items: [
       { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Upcoming Features", url: "/upcoming", icon: Rocket },
     ],
   },
 ];

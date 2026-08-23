@@ -132,6 +132,9 @@ export const api = {
 
   getSessions: () => request<{ sessions: Session[] }>("/api/sessions"),
 
+  deleteSession: (session_id: string) =>
+    request<{ success: boolean }>(`/api/sessions/${session_id}`, { method: "DELETE" }),
+
   exportData: (format: "json" | "csv", collection: "logs" | "alerts") =>
     fetch(`/api/export?format=${format}&collection=${collection}`, {
       headers: authHeaders(),
@@ -145,6 +148,71 @@ export const api = {
 
   getBlockedIps: () =>
     request<{ blocked_ips: { ip: string; blocked_at: string; reason: string }[] }>("/api/blocked-ips"),
+
+  simulateDemo: () =>
+    request<{ success: boolean; logs_inserted: number; alerts_inserted: number; session_id: string }>(
+      "/api/demo/simulate",
+      { method: "POST" }
+    ),
+
+  extractIocs: (text: string) =>
+    request<{
+      success: boolean;
+      total_iocs: number;
+      iocs: {
+        ipv4: string[];
+        ipv6: string[];
+        sha256: string[];
+        sha1: string[];
+        md5: string[];
+        cve: string[];
+        emails: string[];
+        urls: string[];
+        domains: string[];
+      };
+    }>("/api/tools/ioc-extract", { method: "POST", body: JSON.stringify({ text }) }),
+
+  lookupIp: (ip: string) =>
+    request<{
+      success: boolean;
+      ip: string;
+      version: string;
+      classification: string;
+      is_private: boolean;
+      is_global: boolean;
+      reverse_dns: string;
+      defanged: string;
+    }>("/api/tools/ip-lookup", { method: "POST", body: JSON.stringify({ ip }) }),
+
+  decodePayload: (text: string, action = "auto") =>
+    request<{
+      success: boolean;
+      input: string;
+      results: {
+        base64?: string | null;
+        hex?: string | null;
+        url_decode?: string | null;
+        rot13?: string | null;
+        jwt?: { header: object; payload: object; signature: string } | null;
+      };
+    }>("/api/tools/decode", { method: "POST", body: JSON.stringify({ text, action }) }),
+
+  anonymizeLogs: (options: { text: string; mask_ips?: boolean; mask_emails?: boolean; mask_tokens?: boolean; mask_passwords?: boolean }) =>
+    request<{
+      success: boolean;
+      anonymized_text: string;
+      replacements_count: number;
+    }>("/api/tools/anonymize", { method: "POST", body: JSON.stringify(options) }),
+
+  calculateHash: (text: string) =>
+    request<{
+      success: boolean;
+      md5: string;
+      sha1: string;
+      sha256: string;
+      sha512: string;
+      byte_length: number;
+    }>("/api/tools/hash", { method: "POST", body: JSON.stringify({ text }) }),
 };
 
 export interface LogEntry {

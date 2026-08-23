@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -47,6 +47,13 @@ def get_owner(request: Optional[Request]) -> str:
 
     email = request.headers.get("X-User-Email", "").strip().lower()
     return email if email else "anonymous"
+
+
+def _user_scope_filter(owner: str) -> dict:
+    """Build a MongoDB filter that enforces strict per-user tenant isolation."""
+    if owner and owner != "anonymous":
+        return {"$or": [{"owner": owner}, {"user_email": owner}]}
+    return {"$or": [{"owner": "anonymous"}, {"owner": None}, {"owner": {"$exists": False}}]}
 
 
 app = FastAPI(title="LLM Forensic Investigator API", version="1.0.0")
@@ -292,33 +299,210 @@ MAX_STORED_LINES = 10_000_000              # cap stored docs at 10M
 BATCH_SIZE = 10_000                        # insert batch size
 READ_CHUNK = 512 * 1024                    # 512 KB read chunks
 
+import asyncio
+
 # In-memory job tracker: job_id -> status dict
 _upload_jobs: dict = {}
 _jobs_lock = threading.Lock()
 
+# WebSocket connections tracker: job_id -> list[WebSocket]
+_job_websockets: dict[str, list[WebSocket]] = {}
+_ws_lock = threading.Lock()
+_main_loop: Optional[asyncio.AbstractEventLoop] = None
 
-def _process_file_background(job_id: str, tmp_path: str, filename: str, file_size_bytes: int, owner: str = "anonymous"):
-    """Runs in a background thread: parse + store the temp file, update job status."""
+
+@app.on_event("startup")
+async def startup_event():
+    global _main_loop
+    try:
+        _main_loop = asyncio.get_running_loop()
+    except Exception:
+        pass
+
+
+def notify_ws(job_id: str, data: dict):
+    """Thread-safe broadcast of progress and stream events to connected WebSockets."""
+    global _main_loop
+    with _ws_lock:
+        sockets = list(_job_websockets.get(job_id, []))
+    if not sockets:
+        return
+
+    if _main_loop is None or _main_loop.is_closed():
+        try:
+            _main_loop = asyncio.get_event_loop()
+        except Exception:
+            return
+
+    async def _send(ws: WebSocket, payload: dict):
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            pass
+
+    for ws in sockets:
+        try:
+            asyncio.run_coroutine_threadsafe(_send(ws, data), _main_loop)
+        except Exception:
+            pass
+
+
+IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp", "tiff", "svg", "gif"}
+JSON_EXTENSIONS = {"json", "jsonl", "ndjson"}
+TEXT_EXTENSIONS = {"txt", "log", "csv"}
+ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | JSON_EXTENSIONS | TEXT_EXTENSIONS
+STREAM_BATCH_SIZE = 2500
+
+
+def _process_file_background(
+    job_id: str,
+    tmp_path: str,
+    filename: str,
+    file_size_bytes: int,
+    owner: str = "anonymous",
+    ocr_text: Optional[str] = None,
+):
+    """Runs in a background thread: parse + store the temp file (text, json, or image), stream updates via WebSocket."""
     ingested_at = datetime.utcnow().isoformat()
     start = datetime.utcnow()
     total_lines = 0
     total_stored = 0
     total_alerts = 0
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "txt"
 
     def _update(status, **kwargs):
         with _jobs_lock:
             _upload_jobs[job_id].update({"status": status, **kwargs})
 
+    def _flush_batch(batch):
+        nonlocal total_alerts, total_stored
+        if not batch:
+            return
+        try:
+            db["logs"].insert_many(batch, ordered=False)
+        except Exception:
+            pass
+
+        alerts = detect_threats(batch)
+        for a in alerts:
+            a["_id"] = str(uuid.uuid4())
+            a["created_at"] = ingested_at
+            a["owner"] = owner
+            a["user_email"] = owner
+        if alerts:
+            try:
+                db["alerts"].insert_many(alerts, ordered=False)
+                total_alerts += len(alerts)
+            except Exception:
+                pass
+
+        elapsed = max(0.1, (datetime.utcnow() - start).total_seconds())
+        rate = int(total_stored / elapsed)
+
+        recent_sample = [
+            {
+                "id": l.get("_id", str(uuid.uuid4())),
+                "timestamp": l.get("timestamp", ""),
+                "ip": l.get("ip", "unknown"),
+                "event": l.get("event", ""),
+                "level": l.get("level", "info"),
+                "risk": l.get("risk", "low"),
+                "status": l.get("status", "success"),
+                "suspicious": bool(l.get("suspicious")),
+            }
+            for l in batch[:15]
+        ]
+
+        new_alerts_sample = [
+            {
+                "id": a.get("_id", str(uuid.uuid4())),
+                "title": a.get("title", a.get("type", "Alert")),
+                "risk": a.get("risk", "high"),
+                "ip": a.get("source", a.get("ip", "N/A")),
+                "timestamp": a.get("timestamp", ""),
+                "description": a.get("description", ""),
+            }
+            for a in alerts[:8]
+        ] if alerts else []
+
+        _update(
+            "processing",
+            logs_stored=total_stored,
+            threats_detected=total_alerts,
+            rate_per_sec=rate,
+            recent_logs=recent_sample,
+            new_alerts=new_alerts_sample,
+        )
+
+        # Broadcast live progress & recent logs stream over WebSocket
+        notify_ws(job_id, {
+            "type": "progress",
+            "status": "processing",
+            "logs_stored": total_stored,
+            "total_lines": total_lines,
+            "threats_detected": total_alerts,
+            "rate_per_sec": rate,
+            "recent_logs": recent_sample,
+            "new_alerts": new_alerts_sample,
+        })
+
     try:
         db = get_db()
         batch = []
 
-        with open(tmp_path, "r", encoding="utf-8", errors="replace") as fh:
-            for line in fh:
+        def _should_flush(current_stored: int, current_batch_len: int) -> bool:
+            if current_stored < 100:
+                return current_batch_len >= 25
+            if current_stored < 1000:
+                return current_batch_len >= 100
+            return current_batch_len >= 500
+
+        # Case 1: Image file (.png, .jpg, etc.)
+        if ext in IMAGE_EXTENSIONS:
+            if ocr_text and ocr_text.strip():
+                lines = [l for l in ocr_text.splitlines() if l.strip()]
+                for line in lines:
+                    total_lines += 1
+                    if total_stored < MAX_STORED_LINES:
+                        entry = parse_line(line)
+                        if entry:
+                            entry["_id"] = str(uuid.uuid4())
+                            entry["source_file"] = filename
+                            entry["ingested_at"] = ingested_at
+                            entry["owner"] = owner
+                            batch.append(entry)
+                            total_stored += 1
+
+                    if _should_flush(total_stored, len(batch)):
+                        _flush_batch(batch)
+                        batch = []
+            else:
                 total_lines += 1
-                if total_stored < MAX_STORED_LINES:
-                    entry = parse_line(line)
-                    if entry:
+                entry = {
+                    "_id": str(uuid.uuid4()),
+                    "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                    "ip": "127.0.0.1",
+                    "event": f"Image artifact indexed: {filename}",
+                    "status": "success",
+                    "risk": "low",
+                    "raw": f"Screenshot / forensic image uploaded: {filename} ({round(file_size_bytes / 1024, 1)} KB)",
+                    "suspicious": False,
+                    "level": "info",
+                    "source_file": filename,
+                    "ingested_at": ingested_at,
+                    "owner": owner,
+                }
+                batch.append(entry)
+                total_stored += 1
+
+        # Case 2: JSON file (.json)
+        elif ext == "json":
+            with open(tmp_path, "r", encoding="utf-8", errors="replace") as fh:
+                raw_content = fh.read()
+                parsed_entries = parse_logs(raw_content)
+                for entry in parsed_entries:
+                    total_lines += 1
+                    if total_stored < MAX_STORED_LINES:
                         entry["_id"] = str(uuid.uuid4())
                         entry["source_file"] = filename
                         entry["ingested_at"] = ingested_at
@@ -326,33 +510,38 @@ def _process_file_background(job_id: str, tmp_path: str, filename: str, file_siz
                         batch.append(entry)
                         total_stored += 1
 
-                if len(batch) >= BATCH_SIZE:
-                    db["logs"].insert_many(batch)
-                    alerts = detect_threats(batch)
-                    for a in alerts:
-                        a["_id"] = str(uuid.uuid4())
-                        a["created_at"] = ingested_at
-                        a["owner"] = owner
-                    if alerts:
-                        db["alerts"].insert_many(alerts)
-                        total_alerts += len(alerts)
-                    batch = []
-                    _update("processing", logs_stored=total_stored)
+                    if _should_flush(total_stored, len(batch)):
+                        _flush_batch(batch)
+                        batch = []
+
+        # Case 3: Line-by-line for .txt, .log, .csv, .jsonl, .ndjson
+        else:
+            with open(tmp_path, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    total_lines += 1
+                    if total_stored < MAX_STORED_LINES:
+                        entry = parse_line(line)
+                        if entry:
+                            entry["_id"] = str(uuid.uuid4())
+                            entry["source_file"] = filename
+                            entry["ingested_at"] = ingested_at
+                            entry["owner"] = owner
+                            batch.append(entry)
+                            total_stored += 1
+
+                    if _should_flush(total_stored, len(batch)):
+                        _flush_batch(batch)
+                        batch = []
 
         # flush remaining
         if batch:
-            db["logs"].insert_many(batch)
-            alerts = detect_threats(batch)
-            for a in alerts:
-                a["_id"] = str(uuid.uuid4())
-                a["created_at"] = ingested_at
-                a["owner"] = owner
-            if alerts:
-                db["alerts"].insert_many(alerts)
-                total_alerts += len(alerts)
+            _flush_batch(batch)
+            batch = []
 
         if total_stored == 0:
-            _update("failed", error="No parseable log entries found in file")
+            err_msg = "No text or log entries could be recognized from the image." if ext in IMAGE_EXTENSIONS else "No parseable log entries found in file"
+            _update("failed", error=err_msg)
+            notify_ws(job_id, {"type": "error", "error": err_msg})
             return
 
         duration_sec = int((datetime.utcnow() - start).total_seconds())
@@ -368,20 +557,36 @@ def _process_file_background(job_id: str, tmp_path: str, filename: str, file_siz
             "created_at": ingested_at,
             "duration": duration_str,
             "owner": owner,
+            "user_email": owner,
         }
         db["sessions"].insert_one(session_doc)
 
         _update(
             "done",
             logs_parsed=total_stored,
+            logs_stored=total_stored,
             threats_detected=total_alerts,
             session_id=session_doc["_id"],
             file_size_mb=round(file_size_bytes / (1024 * 1024), 2),
             truncated=total_lines > MAX_STORED_LINES,
-            logs_stored=total_stored,
+            duration=duration_str,
         )
+
+        # Send completion event over WebSocket
+        notify_ws(job_id, {
+            "type": "done",
+            "status": "done",
+            "logs_parsed": total_stored,
+            "logs_stored": total_stored,
+            "threats_detected": total_alerts,
+            "session_id": session_doc["_id"],
+            "file_size_mb": round(file_size_bytes / (1024 * 1024), 2),
+            "duration": duration_str,
+            "filename": filename,
+        })
     except Exception as exc:
         _update("failed", error=str(exc))
+        notify_ws(job_id, {"type": "error", "error": str(exc)})
     finally:
         try:
             os.unlink(tmp_path)
@@ -389,14 +594,62 @@ def _process_file_background(job_id: str, tmp_path: str, filename: str, file_siz
             pass
 
 
+@app.websocket("/ws/upload/{job_id}")
+async def ws_upload_stream(websocket: WebSocket, job_id: str):
+    """Real-time WebSocket streaming endpoint for live ingestion and threat detection telemetry."""
+    global _main_loop
+    try:
+        _main_loop = asyncio.get_running_loop()
+    except Exception:
+        pass
+
+    await websocket.accept()
+    with _ws_lock:
+        if job_id not in _job_websockets:
+            _job_websockets[job_id] = []
+        _job_websockets[job_id].append(websocket)
+
+    # Immediately push current status if already initialized
+    with _jobs_lock:
+        job = _upload_jobs.get(job_id)
+    if job:
+        await websocket.send_json({"type": "progress", **job})
+
+    try:
+        while True:
+            msg = await websocket.receive_text()
+            if msg == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        with _ws_lock:
+            if job_id in _job_websockets and websocket in _job_websockets[job_id]:
+                _job_websockets[job_id].remove(websocket)
+                if not _job_websockets[job_id]:
+                    del _job_websockets[job_id]
+
+
+
 @app.post("/api/upload")
-async def upload_logs(request: Request, file: UploadFile = File(...)):
+async def upload_logs(
+    request: Request,
+    file: UploadFile = File(...),
+    ocr_text: Optional[str] = Form(None),
+):
+    global _main_loop
+    try:
+        _main_loop = asyncio.get_running_loop()
+    except Exception:
+        pass
     owner = get_owner(request)
     if not file.filename:
         raise HTTPException(400, "No file provided")
     ext = file.filename.rsplit(".", 1)[-1].lower()
-    if ext not in ("txt", "log", "csv"):
-        raise HTTPException(400, "Unsupported file type. Use .txt, .log, or .csv")
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, f"Unsupported file type .{ext}. Use .txt, .log, .csv, .json, .jsonl, or image formats (.png, .jpg, .webp).")
 
     # Stream file to a temp file on disk
     total_bytes = 0
@@ -434,11 +687,10 @@ async def upload_logs(request: Request, file: UploadFile = File(...)):
     # Kick off background thread
     thread = threading.Thread(
         target=_process_file_background,
-        args=(job_id, tmp_path, file.filename, total_bytes, owner),
+        args=(job_id, tmp_path, file.filename, total_bytes, owner, ocr_text),
         daemon=True,
     )
     thread.start()
-
 
     return {"job_id": job_id, "status": "processing"}
 
@@ -459,7 +711,7 @@ def get_logs(request: Request, limit: int = Query(100, le=500)):
     try:
         db = get_db()
         owner = get_owner(request)
-        user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+        user_filter = _user_scope_filter(owner)
         docs = list(db["logs"].find(user_filter, {"_id": 1, "timestamp": 1, "ip": 1, "event": 1,
                                          "status": 1, "risk": 1, "suspicious": 1, "level": 1, "raw": 1})
                     .sort("ingested_at", -1).limit(limit))
@@ -517,7 +769,7 @@ def live_logs(request: Request, count: int = Query(10, le=50), source: str = Que
         try:
             db = get_db()
             owner = get_owner(request)
-            user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+            user_filter = _user_scope_filter(owner)
             real = list(db["logs"].find(user_filter, {"_id": 1, "timestamp": 1, "ip": 1, "event": 1,
                                               "suspicious": 1, "level": 1, "status": 1, "risk": 1})
                         .sort("ingested_at", -1).limit(count))
@@ -538,7 +790,7 @@ def get_alerts(request: Request):
     try:
         db = get_db()
         owner = get_owner(request)
-        user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+        user_filter = _user_scope_filter(owner)
         docs = list(db["alerts"].find(user_filter, {"_id": 1, "type": 1, "ip": 1, "risk": 1,
                                             "timestamp": 1, "description": 1, "resolved": 1, "title": 1})
                     .sort("created_at", -1).limit(100))
@@ -579,7 +831,7 @@ def investigate(request: Request, req: Optional[InvestigateRequest] = None):
         try:
             db = _safe_get_db()
             owner = get_owner(request) if request else "anonymous"
-            user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+            user_filter = _user_scope_filter(owner)
             logs = list(db["logs"].find(user_filter, {"_id": 0}).sort([("timestamp", -1)]).limit(50))
             if not logs:
                 logs = list(db["alerts"].find(user_filter, {"_id": 0}).limit(20))
@@ -621,7 +873,7 @@ def _get_db_context(owner: str = "anonymous") -> dict:
     """Fetch live database context scoped to the current user."""
     try:
         db = get_db()
-        user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+        user_filter = _user_scope_filter(owner)
         total_logs = db["logs"].count_documents(user_filter)
         total_alerts = db["alerts"].count_documents(user_filter)
         unresolved = db["alerts"].count_documents({**user_filter, "resolved": {"$ne": True}})
@@ -859,10 +1111,10 @@ def get_sessions(request: Request):
     try:
         db = get_db()
         owner = get_owner(request)
-        user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+        user_filter = _user_scope_filter(owner)
         docs = list(db["sessions"].find(user_filter, {"_id": 1, "date": 1, "logs_analyzed": 1,
-                                              "threats_detected": 1, "duration": 1, "status": 1, "source_file": 1})
-                    .sort("created_at", -1).limit(50))
+                                              "threats_detected": 1, "duration": 1, "status": 1, "source_file": 1, "created_at": 1})
+                    .sort("created_at", -1).limit(100))
         for d in docs:
             d["id"] = d.pop("_id")
             d["logsAnalyzed"] = d.pop("logs_analyzed", 0)
@@ -873,13 +1125,23 @@ def get_sessions(request: Request):
         return {"sessions": []}
 
 
+@app.delete("/api/sessions/{session_id}")
+def delete_session(session_id: str):
+    try:
+        db = get_db()
+        db["sessions"].delete_one({"_id": session_id})
+        return {"success": True}
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to delete session: {exc}")
+
+
 # ─── Export ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/export")
 def export(request: Request, format: str = Query("json", enum=["json", "csv"]), collection: str = Query("logs", enum=["logs", "alerts"])):
     db = _safe_get_db()
     owner = get_owner(request)
-    user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+    user_filter = _user_scope_filter(owner)
     docs = list(db[collection].find(user_filter, {"_id": 0}).limit(1000))
 
     if format == "json":
@@ -940,7 +1202,7 @@ def get_blocked_ips(request: Request):
     try:
         db = get_db()
         owner = get_owner(request)
-        user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+        user_filter = _user_scope_filter(owner)
         docs = list(db["blocked_ips"].find(user_filter, {"_id": 0}).sort("blocked_at", -1).limit(100))
         return {"blocked_ips": docs}
     except Exception:
@@ -954,19 +1216,39 @@ def stats(request: Request):
     try:
         db = get_db()
         owner = get_owner(request)
-        user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+        user_filter = _user_scope_filter(owner)
         total_logs = db["logs"].count_documents(user_filter)
         total_alerts = db["alerts"].count_documents(user_filter)
+        
+        # Aggregate logs and threats across sessions to ensure full historical totals
+        sessions = list(db["sessions"].find(user_filter))
+        if sessions:
+            session_logs = sum(s.get("logs_analyzed", 0) for s in sessions)
+            session_threats = sum(s.get("threats_detected", 0) for s in sessions)
+            if session_logs > total_logs:
+                total_logs = session_logs
+            if session_threats > total_alerts:
+                total_alerts = session_threats
+
         unresolved = db["alerts"].count_documents({**user_filter, "resolved": {"$ne": True}})
+        if unresolved == 0 and total_alerts > 0:
+            unresolved = total_alerts
         high_risk = db["alerts"].count_documents({**user_filter, "risk": "high", "resolved": {"$ne": True}})
         last_alert = db["alerts"].find_one(user_filter, sort=[("created_at", -1)])
-        last_ts = last_alert.get("timestamp") or last_alert.get("created_at") if last_alert else None
+        last_session = db["sessions"].find_one(user_filter, sort=[("created_at", -1)])
+        
+        last_ts = None
+        if last_alert:
+            last_ts = last_alert.get("timestamp") or last_alert.get("created_at")
+        elif last_session:
+            last_ts = last_session.get("created_at") or last_session.get("date")
+
         return {
             "logs_analyzed": total_logs,
             "threats_detected": total_alerts,
             "unresolved_alerts": unresolved,
             "high_risk_alerts": high_risk,
-            "risk_level": "High" if high_risk > 0 else ("Medium" if unresolved > 0 else "Low"),
+            "risk_level": "High" if high_risk > 0 else ("Medium" if total_alerts > 0 else "Low"),
             "last_incident": last_ts,
         }
     except Exception:
@@ -1005,8 +1287,9 @@ _DEMO_IPS = ["45.33.32.156", "203.0.113.50", "185.220.101.34", "91.219.236.222",
 
 
 @app.post("/api/demo/simulate")
-def demo_simulate():
+def demo_simulate(request: Request):
     db = _safe_get_db()
+    owner = get_owner(request)
     ingested_at = datetime.utcnow().isoformat()
     logs = []
     for i, (event, event_type, status, risk, suspicious) in enumerate(_DEMO_EVENTS):
@@ -1024,6 +1307,8 @@ def demo_simulate():
             "raw": f"[DEMO] {datetime.utcnow().isoformat()} {ip} {event}",
             "source_file": "demo_simulation",
             "ingested_at": ingested_at,
+            "owner": owner,
+            "user_email": owner,
         }
         logs.append(log)
 
@@ -1034,6 +1319,8 @@ def demo_simulate():
     for a in alerts:
         a["_id"] = str(uuid.uuid4())
         a["created_at"] = ingested_at
+        a["owner"] = owner
+        a["user_email"] = owner
     if alerts:
         db["alerts"].insert_many(alerts)
 
@@ -1046,6 +1333,8 @@ def demo_simulate():
         "status": "completed",
         "created_at": ingested_at,
         "duration": "0s",
+        "owner": owner,
+        "user_email": owner,
     }
     db["sessions"].insert_one(session_doc)
 
@@ -1054,6 +1343,230 @@ def demo_simulate():
         "logs_inserted": len(logs),
         "alerts_inserted": len(alerts),
         "session_id": session_doc["_id"],
+    }
+
+
+# ─── Cybersecurity Log Handling Tools ──────────────────────────────────────────
+
+import re
+import ipaddress
+import hashlib
+import base64
+import urllib.parse
+import binascii
+import codecs
+import socket
+
+
+class IocExtractRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/tools/ioc-extract")
+def tool_ioc_extract(req: IocExtractRequest):
+    text = req.text or ""
+    
+    # Regex patterns
+    ipv4_pattern = r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
+    ipv6_pattern = r'\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b'
+    sha256_pattern = r'\b[0-9a-fA-F]{64}\b'
+    sha1_pattern = r'\b[0-9a-fA-F]{40}\b'
+    md5_pattern = r'\b[0-9a-fA-F]{32}\b'
+    cve_pattern = r'\bCVE-\d{4}-\d{4,7}\b'
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+[^\s]*'
+    domain_pattern = r'\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:com|org|net|io|edu|gov|mil|xyz|info|biz|ru|cn|top|live|club|online|site|app|dev|co|uk|de|eu)\b'
+
+    ipv4s = list(set(re.findall(ipv4_pattern, text)))
+    ipv6s = list(set(re.findall(ipv6_pattern, text)))
+    sha256s = list(set(re.findall(sha256_pattern, text)))
+    sha1s = list(set(re.findall(sha1_pattern, text)))
+    # Exclude matches that are substrings of sha256 or sha1
+    md5s = [m for m in set(re.findall(md5_pattern, text)) if not any(m in s for s in sha256s + sha1s)]
+    sha1s = [s for s in sha1s if not any(s in s256 for s256 in sha256s)]
+    
+    cves = list(set(re.findall(cve_pattern, text, re.IGNORECASE)))
+    emails = list(set(re.findall(email_pattern, text)))
+    urls = list(set(re.findall(url_pattern, text)))
+    domains = [d for d in set(re.findall(domain_pattern, text, re.IGNORECASE)) if not any(d in u for u in urls)]
+
+    return {
+        "success": True,
+        "total_iocs": len(ipv4s) + len(ipv6s) + len(sha256s) + len(sha1s) + len(md5s) + len(cves) + len(emails) + len(urls) + len(domains),
+        "iocs": {
+            "ipv4": sorted(ipv4s),
+            "ipv6": sorted(ipv6s),
+            "sha256": sorted(sha256s),
+            "sha1": sorted(sha1s),
+            "md5": sorted(md5s),
+            "cve": sorted(cves),
+            "emails": sorted(emails),
+            "urls": sorted(urls),
+            "domains": sorted(domains),
+        }
+    }
+
+
+class IpLookupRequest(BaseModel):
+    ip: str
+
+
+@app.post("/api/tools/ip-lookup")
+def tool_ip_lookup(req: IpLookupRequest):
+    ip_str = req.ip.strip()
+    try:
+        ip_obj = ipaddress.ip_address(ip_str)
+        is_private = ip_obj.is_private
+        is_loopback = ip_obj.is_loopback
+        is_multicast = ip_obj.is_multicast
+        is_global = ip_obj.is_global
+        is_reserved = ip_obj.is_reserved
+
+        classification = "Public / External" if is_global else (
+            "Private (RFC 1918)" if is_private else (
+                "Loopback / Localhost" if is_loopback else (
+                    "Multicast" if is_multicast else "Reserved / Bogon"
+                )
+            )
+        )
+
+        hostname = None
+        try:
+            hostname = socket.gethostbyaddr(ip_str)[0]
+        except Exception:
+            hostname = "No reverse DNS record"
+
+        return {
+            "success": True,
+            "ip": ip_str,
+            "version": f"IPv{ip_obj.version}",
+            "classification": classification,
+            "is_private": is_private,
+            "is_global": is_global,
+            "reverse_dns": hostname,
+            "defanged": ip_str.replace(".", "[.]"),
+        }
+    except ValueError as e:
+        raise HTTPException(400, f"Invalid IP address format: {e}")
+
+
+class DecodeRequest(BaseModel):
+    text: str
+    action: str = "auto"  # auto, base64, hex, url, rot13, jwt
+
+
+@app.post("/api/tools/decode")
+def tool_decode(req: DecodeRequest):
+    text = (req.text or "").strip()
+    results = {}
+
+    # Base64
+    try:
+        # Pad if needed
+        padded = text + "=" * (-len(text) % 4)
+        b64_bytes = base64.b64decode(padded, validate=False)
+        b64_str = b64_bytes.decode("utf-8", errors="replace")
+        results["base64"] = b64_str
+    except Exception:
+        results["base64"] = None
+
+    # Hex
+    try:
+        clean_hex = text.replace("0x", "").replace(" ", "").replace("\\x", "")
+        hex_bytes = bytes.fromhex(clean_hex)
+        results["hex"] = hex_bytes.decode("utf-8", errors="replace")
+    except Exception:
+        results["hex"] = None
+
+    # URL Decode
+    try:
+        url_dec = urllib.parse.unquote(text)
+        results["url_decode"] = url_dec if url_dec != text else url_dec
+    except Exception:
+        results["url_decode"] = None
+
+    # ROT13
+    try:
+        results["rot13"] = codecs.decode(text, "rot_13")
+    except Exception:
+        results["rot13"] = None
+
+    # JWT Debug
+    jwt_data = None
+    if text.count(".") == 2:
+        parts = text.split(".")
+        try:
+            def _jwt_b64(seg):
+                s = seg + "=" * (-len(seg) % 4)
+                return json.loads(base64.urlsafe_b64decode(s).decode("utf-8"))
+            jwt_data = {
+                "header": _jwt_b64(parts[0]),
+                "payload": _jwt_b64(parts[1]),
+                "signature": parts[2][:16] + "..."
+            }
+        except Exception:
+            pass
+    results["jwt"] = jwt_data
+
+    return {"success": True, "input": text, "results": results}
+
+
+class AnonymizeRequest(BaseModel):
+    text: str
+    mask_ips: bool = True
+    mask_emails: bool = True
+    mask_tokens: bool = True
+    mask_passwords: bool = True
+
+
+@app.post("/api/tools/anonymize")
+def tool_anonymize(req: AnonymizeRequest):
+    sanitized = req.text or ""
+    replacements = 0
+
+    if req.mask_ips:
+        ip_pat = r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
+        ips = set(re.findall(ip_pat, sanitized))
+        for idx, ip in enumerate(ips, 1):
+            sanitized = sanitized.replace(ip, f"10.0.X.{idx}")
+            replacements += 1
+
+    if req.mask_emails:
+        email_pat = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = set(re.findall(email_pat, sanitized))
+        for idx, em in enumerate(emails, 1):
+            sanitized = sanitized.replace(em, f"user_{idx}@anonymized.local")
+            replacements += 1
+
+    if req.mask_tokens:
+        tok_pat = r'(Bearer\s+[A-Za-z0-9\-\._~\+\/]+=*)|(token[:=]\s*["\']?[A-Za-z0-9\-_]{16,}["\']?)'
+        sanitized = re.sub(tok_pat, "Bearer [REDACTED_TOKEN]", sanitized, flags=re.IGNORECASE)
+
+    if req.mask_passwords:
+        pw_pat = r'(password|passwd|pwd|secret|api_key|apikey)[:=]\s*["\']?([^"\'\s,\}\]]+)["\']?'
+        sanitized = re.sub(pw_pat, r'\1="[REDACTED_SECRET]"', sanitized, flags=re.IGNORECASE)
+
+    return {
+        "success": True,
+        "anonymized_text": sanitized,
+        "replacements_count": replacements,
+    }
+
+
+class HashRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/tools/hash")
+def tool_hash(req: HashRequest):
+    data = (req.text or "").encode("utf-8")
+    return {
+        "success": True,
+        "md5": hashlib.md5(data).hexdigest(),
+        "sha1": hashlib.sha1(data).hexdigest(),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "sha512": hashlib.sha512(data).hexdigest(),
+        "byte_length": len(data),
     }
 
 
@@ -1070,5 +1583,5 @@ def clear_all_data():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("BACKEND_PORT", "8000"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
 

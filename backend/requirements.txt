@@ -8,3 +8,6 @@ python-jose[cryptography]
 passlib[bcrypt]
 bcrypt
 python-dotenv>=1.0.0
+websockets>=13.0
+Pillow>=10.0.0
+

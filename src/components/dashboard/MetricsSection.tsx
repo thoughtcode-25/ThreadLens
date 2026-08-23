@@ -39,7 +39,10 @@ function MetricCard({ title, value, icon: Icon, trend, variant = "default" }: Me
   );
 }
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export function MetricsSection() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<{
     logs_analyzed: number;
     threats_detected: number;
@@ -50,6 +53,7 @@ export function MetricsSection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     api.stats()
       .then((data) => {
         setStats({
@@ -66,7 +70,7 @@ export function MetricsSection() {
         setStats({ logs_analyzed: 0, threats_detected: 0, unresolved_alerts: 0, risk_level: "Low", last_incident: null });
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.email]);
 
   const s = stats ?? { logs_analyzed: 0, threats_detected: 0, unresolved_alerts: 0, risk_level: "Low", last_incident: null };
   const isEmpty = !loading && s.logs_analyzed === 0 && s.threats_detected === 0;

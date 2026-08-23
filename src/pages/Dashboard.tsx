@@ -9,14 +9,15 @@ import { api } from "@/lib/api";
 const Dashboard = () => {
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoResult, setDemoResult] = useState<{ logs: number; threats: number } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const runDemo = async () => {
     setDemoLoading(true);
     setDemoResult(null);
     try {
-      const res = await fetch("/api/demo/simulate", { method: "POST" });
-      const data = await res.json();
+      const data = await api.simulateDemo();
       setDemoResult({ logs: data.logs_inserted ?? 0, threats: data.alerts_inserted ?? 0 });
+      setRefreshKey((prev) => prev + 1);
     } catch {
       setDemoResult({ logs: 0, threats: 0 });
     } finally {
@@ -55,11 +56,11 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <MetricsSection />
+        <MetricsSection key={`metrics-${refreshKey}`} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="flex flex-col gap-6">
-            <AlertsPanel />
+            <AlertsPanel key={`alerts-${refreshKey}`} />
           </div>
           <div className="flex flex-col h-[420px]">
             <AiAnalysisPanel />

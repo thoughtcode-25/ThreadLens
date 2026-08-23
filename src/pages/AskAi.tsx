@@ -18,7 +18,10 @@ function formatDate(iso: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+import { useAuth } from "@/contexts/AuthContext";
+
 const AskAi = () => {
+  const { user } = useAuth();
   const location = useLocation();
   const locationState = location.state as {
     initialMessage?: string;
@@ -33,7 +36,7 @@ const AskAi = () => {
   const [activeTitle, setActiveTitle] = useState<string>(locationState?.activeTitle ?? "");
 
   const { data: historyData } = useQuery({
-    queryKey: ["/api/chat/sessions"],
+    queryKey: ["/api/chat/sessions", user?.email],
     queryFn: () => api.listChatSessions(),
     refetchInterval: 5000,
   });
@@ -41,7 +44,7 @@ const AskAi = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.deleteChatSession(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/sessions", user?.email] });
       if (activeSessionId === id) {
         setActiveSessionId(null);
         setActiveTitle("");

@@ -17,53 +17,49 @@ function RiskBadge({ risk }: { risk: Alert["risk"] }) {
   );
 }
 
+import { useAuth } from "@/contexts/AuthContext";
+import { BlockIpModal, type ThreatIpInfo } from "@/components/modals/BlockIpModal";
+
 export function AlertsPanel() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
-  const [blockingIp, setBlockingIp] = useState(false);
+  const [modalThreat, setModalThreat] = useState<ThreatIpInfo | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [investigating, setInvestigating] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
+    setAlerts([]);
     api.getAlerts()
-      .then((data) => { if (data.alerts?.length) setAlerts(data.alerts); })
-      .catch(() => {})
+      .then((data) => { setAlerts(data.alerts || []); })
+      .catch(() => { setAlerts([]); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.email]);
 
   const unresolved = alerts.filter((a) => !a.resolved).length;
 
-  const handleBlockIp = async (alert: Alert) => {
-    if (!alert.source || blockingIp) return;
-    setBlockingIp(true);
-    try {
-      const result = await api.blockIp(alert.source, alert.id, `Blocked due to alert: ${alert.title}`);
-      if (result.already_blocked) {
-        toast({
-          title: "Already Blocked",
-          description: `IP ${alert.source} is already in the block list.`,
-        });
-      } else {
-        toast({
-          title: "IP Blocked",
-          description: `${alert.source} has been blocked and the alert marked as resolved.`,
-        });
-        setAlerts((prev) =>
-          prev.map((a) => a.id === alert.id ? { ...a, resolved: true } : a)
-        );
-        setSelectedAlert((prev) => prev?.id === alert.id ? { ...prev, resolved: true } : prev);
-      }
-    } catch {
-      toast({
-        title: "Block Failed",
-        description: "Could not block the IP. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setBlockingIp(false);
-    }
+  const openBlockModal = (alert: Alert) => {
+    if (!alert.source) return;
+    setModalThreat({
+      ip: alert.source,
+      threatType: alert.title,
+      risk: alert.risk,
+      sourceEvent: alert.description,
+      alertId: alert.id,
+      timestamp: alert.timestamp,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleBlockSuccess = (blockedIp: string) => {
+    setAlerts((prev) =>
+      prev.map((a) => (a.source === blockedIp || a.id === modalThreat?.alertId) ? { ...a, resolved: true } : a)
+    );
+    setSelectedAlert((prev) => (prev?.source === blockedIp || prev?.id === modalThreat?.alertId) ? { ...prev, resolved: true } : prev);
   };
 
   const handleInvestigate = async (alert: Alert) => {
@@ -119,16 +115,12 @@ export function AlertsPanel() {
             <div className="flex gap-2 mt-2">
               <button
                 data-testid="button-block-ip"
-                onClick={() => handleBlockIp(selectedAlert)}
-                disabled={blockingIp || selectedAlert.resolved}
+                onClick={() => openBlockModal(selectedAlert)}
+                disabled={selectedAlert.resolved}
                 className="cyber-btn text-xs !py-1.5 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {blockingIp ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <ShieldOff className="w-3 h-3" />
-                )}
-                {blockingIp ? "Blocking..." : selectedAlert.resolved ? "Blocked" : "Block IP"}
+                <ShieldOff className="w-3 h-3" />
+                {selectedAlert.resolved ? "Blocked" : "Block IP"}
               </button>
               <button
                 data-testid="button-investigate"
@@ -186,6 +178,14 @@ export function AlertsPanel() {
           ))}
         </div>
       )}
+
+      {/* Threat / Spam IP Confirmation Modal (Block IP / Cancel) */}
+      <BlockIpModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        threat={modalThreat}
+        onSuccess={handleBlockSuccess}
+      />
     </div>
   );
 }

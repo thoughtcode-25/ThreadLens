@@ -1,0 +1,1 @@
+[{"_id":"c92b772b-610b-41ab-a67d-2f1ba5a31ebc","ip":"198.51.100.23","blocked_at":"2026-08-23T10:24:54.427179","reason":"Access to sensitive path detected from 198.51.100.23: [DEMO] 2026-08-23T10:21:54.271662 198.51.100.23 Unauthorized /etc/passwd access ","owner":"ffstorage316@gmail.com"}]

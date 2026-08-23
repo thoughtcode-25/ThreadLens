@@ -23,8 +23,14 @@ def get_jwt_secret() -> str:
     return os.environ.get("JWT_SECRET") or os.environ.get("SESSION_SECRET") or "dev-insecure-jwt-secret-key-12345"
 
 
-def get_smtp_credentials() -> tuple[str, str]:
-    return os.environ.get("SMTP_EMAIL", "").strip(), os.environ.get("SMTP_PASSWORD", "").strip()
+def get_smtp_credentials():
+    email = os.environ.get("SMTP_EMAIL", "").strip()
+    password = os.environ.get("SMTP_PASSWORD", "").replace(" ", "").strip()
+    host = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
+    port_val = os.environ.get("SMTP_PORT", "").strip()
+    port = int(port_val) if port_val.isdigit() else (465 if "gmail" in host.lower() else 587)
+    use_ssl = os.environ.get("SMTP_USE_SSL", "true" if port == 465 else "false").lower() in ("true", "1", "yes")
+    return email, password, host, port, use_ssl
 
 
 def hash_password(password: str) -> str:
@@ -55,7 +61,7 @@ def generate_otp(length: int = 6) -> str:
 
 
 def send_verification_email(to_email: str, otp: str, name: str = "") -> bool:
-    smtp_email, smtp_password = get_smtp_credentials()
+    smtp_email, smtp_password, smtp_host, smtp_port, use_ssl = get_smtp_credentials()
     if not smtp_email or not smtp_password:
         print("[AUTH] SMTP not configured — OTP:", otp)
         return False
@@ -89,11 +95,18 @@ def send_verification_email(to_email: str, otp: str, name: str = "") -> bool:
         msg["To"] = to_email
         msg.attach(MIMEText(html, "html"))
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
-            server.login(smtp_email, smtp_password)
-            server.sendmail(smtp_email, to_email, msg.as_string())
+        if use_ssl:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+                server.login(smtp_email, smtp_password)
+                server.sendmail(smtp_email, to_email, msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                server.starttls()
+                server.login(smtp_email, smtp_password)
+                server.sendmail(smtp_email, to_email, msg.as_string())
+        print(f"[AUTH] Verification email successfully sent to {to_email}")
         return True
     except Exception as e:
-        print(f"[AUTH] Email send failed: {e}")
+        print(f"[AUTH] Email send failed via {smtp_host}:{smtp_port}: {e}")
         return False
 

@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   ShieldAlert,
   ShieldCheck,
+  ShieldOff,
   CheckCircle2,
   XCircle,
   Copy,
@@ -21,6 +22,7 @@ import {
   ArrowDownCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { BlockIpModal, type ThreatIpInfo } from "@/components/modals/BlockIpModal";
 
 interface Props {
   isActive?: boolean;
@@ -49,6 +51,26 @@ export function LiveLogsPanel({ isActive = true, mode = "demo", apiEndpoint }: P
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  const [modalThreat, setModalThreat] = useState<ThreatIpInfo | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openBlockModal = (log: LogEntry) => {
+    setModalThreat({
+      ip: log.ip,
+      threatType: log.event,
+      risk: log.level === "critical" ? "high" : log.level === "error" ? "medium" : "low",
+      sourceEvent: log.raw || log.event,
+      timestamp: log.timestamp,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleBlockSuccess = (blockedIp: string) => {
+    setLogs((prev) =>
+      prev.map((l) => (l.ip === blockedIp ? { ...l, status: "blocked" } : l))
+    );
+  };
 
   // Reset or initialize on isActive toggle
   useEffect(() => {
@@ -391,7 +413,7 @@ export function LiveLogsPanel({ isActive = true, mode = "demo", apiEndpoint }: P
           <Activity className="w-12 h-12 text-muted-foreground/30 animate-pulse" />
           <p className="text-sm font-semibold text-muted-foreground/80">Monitoring is Inactive</p>
           <p className="text-xs text-muted-foreground/50 max-w-sm">
-            Select Demo Mode or an API Endpoint above and click "Start Monitoring" to generate real-time log events continuously.
+            Select Demo Mode or a Webhook Endpoint above and click "Start Monitoring" to generate real-time log events continuously.
           </p>
         </div>
       ) : (
@@ -506,6 +528,17 @@ export function LiveLogsPanel({ isActive = true, mode = "demo", apiEndpoint }: P
                             )}
                           </button>
 
+                          {/* Block IP Action Modal Button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openBlockModal(log);
+                            }}
+                            className="flex items-center gap-1 text-[11px] text-destructive hover:bg-destructive/20 px-2 py-0.5 rounded bg-destructive/10 border border-destructive/30 font-medium"
+                          >
+                            <ShieldOff className="w-3 h-3" /> Block IP
+                          </button>
+
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -569,6 +602,13 @@ export function LiveLogsPanel({ isActive = true, mode = "demo", apiEndpoint }: P
         </span>
         <span>Showing {filteredLogs.length} of {logs.length} logs in buffer</span>
       </div>
+
+      <BlockIpModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        threat={modalThreat}
+        onSuccess={handleBlockSuccess}
+      />
     </div>
   );
 }

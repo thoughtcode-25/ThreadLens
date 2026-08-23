@@ -7,7 +7,7 @@ import {
   ExternalLink, HelpCircle, Users, Check, X, ShieldAlert,
   Sliders, Eye, Network, FileSearch, ArrowUpRight, Compass,
   FolderGit2, Clock, GitCommit, GitBranch, RefreshCw, Key,
-  CheckCircle, Workflow, AlertCircle, Menu, Flame
+  CheckCircle, Workflow, AlertCircle, Menu, Flame, Mail, Copy
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -1578,6 +1578,27 @@ export default function LandingPage() {
               Explore the platform
             </a>
           </div>
+
+          {/* Contact Option Card */}
+          <div className="mt-14 p-6 sm:p-8 rounded-2xl glass-panel border border-primary/40 bg-slate-950/80 max-w-2xl mx-auto text-center space-y-3.5 shadow-2xl animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-primary/20 text-primary border border-primary/40">
+              <Mail className="w-3.5 h-3.5" />
+              <span>Direct Inquiries & Support</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-white">Have questions or want to partner with us?</h3>
+            <p className="text-xs sm:text-sm text-slate-300">
+              Reach out to our security engineering and research team directly:
+            </p>
+            <div className="pt-2 flex items-center justify-center">
+              <a
+                href="mailto:businessthought.code@gmail.com"
+                className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-primary/25 transition-all hover:scale-105"
+              >
+                <Mail className="w-4 h-4" />
+                <span>businessthought.code@gmail.com</span>
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1636,8 +1657,8 @@ export default function LandingPage() {
             <ul className="space-y-2 text-slate-400">
               <li><a href="#why-threadlens" className="hover:text-white transition-colors">About</a></li>
               <li><a href="#ai-forensics" className="hover:text-white transition-colors">Technology</a></li>
-              <li><a href="#future-tech" className="hover:text-white transition-colors">Roadmap</a></li>
-              <li><Link to="/signup" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link to="/upcoming" className="hover:text-white transition-colors">Roadmap</Link></li>
+              <li><a href="mailto:businessthought.code@gmail.com" className="hover:text-white text-primary transition-colors">Contact Us</a></li>
             </ul>
           </div>
 
@@ -1646,9 +1667,11 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-slate-400 text-[11px] gap-4">
           <p>© 2026 ThreadLens • AI-Powered Security Forensics</p>
           <div className="flex items-center gap-6">
+            <a href="mailto:businessthought.code@gmail.com" className="text-slate-300 hover:text-white transition-colors flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-primary" /> businessthought.code@gmail.com
+            </a>
             <a href="#faq" className="hover:text-slate-200 transition-colors">Privacy</a>
             <a href="#faq" className="hover:text-slate-200 transition-colors">Terms</a>
-            <a href="#faq" className="hover:text-slate-200 transition-colors">Security</a>
           </div>
         </div>
       </footer>

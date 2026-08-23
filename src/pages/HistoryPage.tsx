@@ -16,9 +16,11 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const HistoryPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"logs" | "chats">("logs");
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -26,6 +28,9 @@ const HistoryPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
+    setSessions([]);
+    setChatSessions([]);
     Promise.allSettled([api.getSessions(), api.listChatSessions()])
       .then(([sessionsRes, chatRes]) => {
         if (sessionsRes.status === "fulfilled" && sessionsRes.value.sessions) {
@@ -36,7 +41,7 @@ const HistoryPage = () => {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.email]);
 
   const handleOpenLogReport = (session: Session) => {
     navigate("/report", {
@@ -69,6 +74,17 @@ const HistoryPage = () => {
         activeTitle: chat.title,
       },
     });
+  };
+
+  const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await api.deleteSession(id);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      toast({ title: "Log session removed from history" });
+    } catch {
+      toast({ title: "Could not remove log session", variant: "destructive" });
+    }
   };
 
   const handleDeleteChat = async (id: string, e: React.MouseEvent) => {
@@ -211,6 +227,14 @@ const HistoryPage = () => {
                       <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
                       <span>Report</span>
                       <ChevronRight className="w-3 h-3 ml-0.5" />
+                    </button>
+
+                    <button
+                      onClick={(e) => handleDeleteSession(session.id, e)}
+                      title="Delete log session"
+                      className="p-2 rounded-lg text-slate-400 hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-destructive/20"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

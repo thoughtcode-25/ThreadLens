@@ -30,7 +30,7 @@ const LiveMonitoring = () => {
   const handleStart = () => {
     if (mode === "api") {
       if (!apiEndpoint.trim()) {
-        setEndpointError("Please enter an API endpoint to monitor.");
+        setEndpointError("Please enter a Webhook endpoint URL to monitor.");
         return;
       }
       if (!apiEndpoint.startsWith("http")) {
@@ -70,7 +70,7 @@ const LiveMonitoring = () => {
                 </span>
                 <span className="flex items-center gap-2 text-xs text-safe bg-safe/10 border border-safe/20 rounded-full px-3 py-1.5">
                   <span className="w-2 h-2 rounded-full bg-safe pulse-dot" />
-                  {mode === "demo" ? "Continuous Demo Mode Active" : "API Streaming Active"}
+                  {mode === "demo" ? "Continuous Demo Mode Active" : "Webhook Streaming Active"}
                 </span>
               </>
             )}
@@ -104,7 +104,7 @@ const LiveMonitoring = () => {
                 }`}
               >
                 <Plug className="w-4 h-4" />
-                API Endpoint
+                Webhook Endpoint
               </button>
             </div>
 
@@ -116,11 +116,11 @@ const LiveMonitoring = () => {
 
             {mode === "api" && (
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">API Endpoint URL</label>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Webhook Endpoint URL</label>
                 <input
                   value={apiEndpoint}
                   onChange={(e) => { setApiEndpoint(e.target.value); setEndpointError(""); }}
-                  placeholder="https://your-log-api.com/stream"
+                  placeholder="https://your-domain.com/api/webhook/logs"
                   className="cyber-input w-full text-sm"
                   data-testid="input-api-endpoint"
                 />
