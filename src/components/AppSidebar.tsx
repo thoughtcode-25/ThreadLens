@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Home, LayoutDashboard, Activity, Search, History, Bot,
-  Settings, Shield, LogOut, User, ChevronUp,
+  Settings, Shield, LogOut, User, ChevronUp, Lock, Unlock, Pin, PinOff,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,7 +57,29 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [expanded, setExpanded] = useState(false);
+  const [isLocked, setIsLocked] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sidebar_locked");
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+  const [isHovered, setIsHovered] = useState(false);
+
+  const expanded = isLocked || isHovered;
+
+  const toggleLock = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIsLocked((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("sidebar_locked", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     Monitor: true,
     Investigate: true,
@@ -66,7 +88,7 @@ export function AppSidebar() {
 
   const handleLogout = () => {
     logout();
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   };
 
   const isActive = (url: string) =>
@@ -81,22 +103,71 @@ export function AppSidebar() {
 
   return (
     <aside
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={`min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
         expanded ? "w-56" : "w-14"
       }`}
       style={{ zIndex: 40 }}
     >
-      {/* ── Brand ── */}
-      <div className="h-14 border-b border-sidebar-border flex items-center px-3 gap-3 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center glow-primary shrink-0">
-          <Shield className="w-4 h-4 text-primary" />
+      {/* ── Brand & Lock Section ── */}
+      <div className="border-b border-sidebar-border shrink-0 bg-sidebar/50">
+        <div className="h-14 flex items-center px-3 gap-3 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center glow-primary shrink-0">
+              <Shield className="w-4 h-4 text-primary" />
+            </div>
+            <div className={`transition-all duration-200 overflow-hidden ${expanded ? "opacity-100 w-auto" : "opacity-0 w-0"}`}>
+              <p className="text-sm font-bold text-foreground whitespace-nowrap leading-tight">Thread Lens</p>
+              <p className="text-[10px] text-primary/80 uppercase tracking-widest whitespace-nowrap">Security</p>
+            </div>
+          </div>
+
+          {/* Top Pin/Lock quick toggle icon */}
+          {expanded && (
+            <button
+              onClick={toggleLock}
+              title={isLocked ? "Unlock Sidebar (auto-collapse on mouse leave)" : "Lock Sidebar open"}
+              className={`p-1.5 rounded-md transition-colors shrink-0 ${
+                isLocked
+                  ? "text-primary hover:bg-primary/20"
+                  : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+              }`}
+            >
+              {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+            </button>
+          )}
         </div>
-        <div className={`transition-all duration-200 overflow-hidden ${expanded ? "opacity-100 w-auto" : "opacity-0 w-0"}`}>
-          <p className="text-sm font-bold text-foreground whitespace-nowrap leading-tight">Thread Lens</p>
-          <p className="text-[10px] text-primary/80 uppercase tracking-widest whitespace-nowrap">Security</p>
-        </div>
+
+        {/* Lock Option Button right below Thread Lens */}
+        {expanded && (
+          <div className="px-2.5 pb-2.5 pt-0.5">
+            <button
+              onClick={toggleLock}
+              data-testid="sidebar-lock-toggle"
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-all border ${
+                isLocked
+                  ? "bg-primary/15 border-primary/30 text-primary font-medium shadow-sm"
+                  : "bg-sidebar-accent/40 border-sidebar-border/80 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent hover:border-sidebar-border"
+              }`}
+              title={isLocked ? "Sidebar is locked open. Click to allow auto-sliding." : "Sidebar slides on hover. Click to lock open."}
+            >
+              <div className="flex items-center gap-2">
+                {isLocked ? <Lock className="w-3.5 h-3.5 text-primary" /> : <Unlock className="w-3.5 h-3.5 text-muted-foreground" />}
+                <span className="text-[11px] font-medium whitespace-nowrap">
+                  {isLocked ? "Menu Locked" : "Lock Menu"}
+                </span>
+              </div>
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold uppercase tracking-wider ${
+                  isLocked ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {isLocked ? "ON" : "OFF"}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Top standalone items ── */}

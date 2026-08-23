@@ -129,7 +129,7 @@ const Home = () => {
 
   const removeAttachment = (idx: number) => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx));
 
-  const handleLogout = () => { logout(); navigate("/login", { replace: true }); };
+  const handleLogout = () => { logout(); navigate("/", { replace: true }); };
 
   const toggleGroup = (title: string) => setOpenGroups((prev) => ({ ...prev, [title]: !prev[title] }));
 

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import CyberBackground from "@/components/CyberBackground";
+import LandingPage from "./pages/LandingPage.tsx";
 import Login from "./pages/Login.tsx";
 import Signup from "./pages/Signup.tsx";
 import VerifyEmail from "./pages/VerifyEmail.tsx";
@@ -31,10 +32,12 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/" element={isAuthenticated ? <Home /> : <LandingPage />} />
+      <Route path="/landing" element={<LandingPage />} />
+      <Route path="/security" element={<LandingPage />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/signup" element={isAuthenticated ? <Navigate to="/" replace /> : <Signup />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/monitoring" element={<PrivateRoute><LiveMonitoring /></PrivateRoute>} />
       <Route path="/analyze" element={<PrivateRoute><AnalyzeLogs /></PrivateRoute>} />
