@@ -1,0 +1,12 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+pymongo==4.8.0
+groq==0.13.0
+python-multipart==0.0.9
+pydantic==2.9.2
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt
+python-dotenv>=1.0.0
+websockets>=13.0
+Pillow>=10.0.0

@@ -764,6 +764,7 @@ def _gen_live_log():
 
 
 @app.get("/api/live-logs")
+@app.get("/api/webhook/logs")
 def live_logs(request: Request, count: int = Query(10, le=50), source: str = Query("simulated")):
     if source == "db":
         try:
@@ -781,6 +782,37 @@ def live_logs(request: Request, count: int = Query(10, le=50), source: str = Que
             pass
     logs = [_gen_live_log() for _ in range(count)]
     return {"logs": logs}
+
+
+@app.post("/api/webhook/logs")
+async def webhook_receive_logs(request: Request):
+    try:
+        body = await request.json()
+        db = get_db()
+        owner = get_owner(request)
+        
+        # Accept single log dict or list of logs
+        log_items = body if isinstance(body, list) else [body]
+        inserted = 0
+        for item in log_items:
+            doc = {
+                "owner": owner,
+                "user_email": owner,
+                "timestamp": item.get("timestamp") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+                "ip": item.get("ip") or "127.0.0.1",
+                "event": item.get("event") or item.get("message") or "Webhook log event",
+                "level": item.get("level") or "info",
+                "status": item.get("status") or "success",
+                "risk": item.get("risk") or "low",
+                "suspicious": bool(item.get("suspicious", False)),
+                "raw": json.dumps(item) if isinstance(item, dict) else str(item),
+                "ingested_at": datetime.now(timezone.utc).isoformat(),
+            }
+            db["logs"].insert_one(doc)
+            inserted += 1
+        return {"success": True, "logs_received": inserted}
+    except Exception as e:
+        raise HTTPException(400, f"Invalid webhook payload: {str(e)}")
 
 
 # ─── Alerts ────────────────────────────────────────────────────────────────────
@@ -1580,8 +1612,34 @@ def clear_all_data():
     return {"success": True, "deleted": results}
 
 
+# ─── Full-Stack SPA Static File Serving (Unified Deployment) ───────────────────
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# Check for dist folder in repo root
+_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_frontend_dist = os.path.join(_base_dir, "dist")
+
+if os.path.exists(_frontend_dist):
+    _assets_dir = os.path.join(_frontend_dist, "assets")
+    if os.path.exists(_assets_dir):
+        app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        if full_path.startswith("api/") or full_path == "docs" or full_path == "openapi.json" or full_path == "redoc":
+            raise HTTPException(404, "API route not found")
+        file_path = os.path.join(_frontend_dist, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        index_file = os.path.join(_frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(404, "Page not found")
+
+
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("BACKEND_PORT", "8000"))
+    port = int(os.environ.get("BACKEND_PORT", os.environ.get("PORT", "8000")))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
 

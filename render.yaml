@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: threadlens-soc
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SMTP_EMAIL
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
