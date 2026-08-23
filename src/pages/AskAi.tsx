@@ -20,12 +20,17 @@ function formatDate(iso: string) {
 
 const AskAi = () => {
   const location = useLocation();
-  const locationState = location.state as { initialMessage?: string; initialAttachments?: { name: string; type: "image" | "text"; dataUrl?: string }[] } | null;
+  const locationState = location.state as {
+    initialMessage?: string;
+    initialAttachments?: { name: string; type: "image" | "text"; dataUrl?: string }[];
+    activeSessionId?: string;
+    activeTitle?: string;
+  } | null;
   const initialMessage = locationState?.initialMessage;
   const initialAttachments = locationState?.initialAttachments;
   const queryClient = useQueryClient();
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [activeTitle, setActiveTitle] = useState<string>("");
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(locationState?.activeSessionId ?? null);
+  const [activeTitle, setActiveTitle] = useState<string>(locationState?.activeTitle ?? "");
 
   const { data: historyData } = useQuery({
     queryKey: ["/api/chat/sessions"],

@@ -179,17 +179,21 @@ def _chat_with_history(question: str, history: list[dict], db_context: dict | No
 def _extract_json(text: str) -> dict:
     """Extract and parse JSON object from text, even if wrapped in markdown code blocks or surrounding text."""
     text = text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
+    if "```" in text:
+        parts = text.split("```")
+        for p in parts[1:]:
+            p_clean = p.strip()
+            if p_clean.startswith("json"):
+                p_clean = p_clean[4:].strip()
+            try:
+                return json.loads(p_clean)
+            except Exception:
+                pass
 
     try:
         return json.loads(text)
     except Exception:
-        # Try finding the first '{' and matching '}'
-        match = re.search(r"\{.*\}", text, re.DOTALL)
+        match = re.search(r"\{[\s\S]*\}", text)
         if match:
             return json.loads(match.group())
         raise
@@ -198,7 +202,7 @@ def _extract_json(text: str) -> dict:
 def analyze_event(event_data: dict) -> dict:
     prompt = f"""You are a cybersecurity expert. Analyze the following security event:
 
-{json.dumps(event_data, indent=2)}
+{json.dumps(event_data, indent=2, default=str)}
 
 Respond ONLY with a JSON object (no markdown, no code blocks) with exactly these fields:
 {{
@@ -209,13 +213,13 @@ Respond ONLY with a JSON object (no markdown, no code blocks) with exactly these
   "recommended_actions": ["<action 1>", "<action 2>", "<action 3>"]
 }}"""
 
-    text = _chat(prompt)
     try:
+        text = _chat(prompt)
         return _extract_json(text)
     except Exception:
         return {
-            "explanation": text[:300],
-            "attack_type": event_data.get("event", "Suspicious Activity"),
+            "explanation": "Potential anomalous security activity detected in the system event logs.",
+            "attack_type": event_data.get("event", event_data.get("title", "Suspicious Activity")),
             "risk_level": event_data.get("risk", "medium"),
             "why_dangerous": "Potential unauthorized system access or reconnaissance activity.",
             "recommended_actions": ["Monitor source IP", "Verify credentials", "Review firewall logs"],
@@ -226,7 +230,7 @@ def investigate_sequence(logs: list[dict]) -> dict:
     sample = logs[:50] if len(logs) > 50 else logs
     prompt = f"""You are a cybersecurity forensic expert. Analyze the following sequence of security log events:
 
-{json.dumps(sample, indent=2)}
+{json.dumps(sample, indent=2, default=str)}
 
 Identify the attack flow, root cause, and attacker intent.
 Respond ONLY with a JSON object (no markdown, no code blocks) with exactly these fields:
@@ -240,13 +244,13 @@ Respond ONLY with a JSON object (no markdown, no code blocks) with exactly these
   "summary": "<one paragraph summary>"
 }}"""
 
-    text = _chat(prompt)
     try:
+        text = _chat(prompt)
         return _extract_json(text)
     except Exception:
         return {
-            "attack_flow": text[:300],
-            "root_cause": "Multiple suspicious log anomalies detected in the log stream.",
+            "attack_flow": "Correlated log sequence identified repetitive connection requests and access probes.",
+            "root_cause": "Multiple suspicious log anomalies detected in the analyzed log stream.",
             "attacker_intent": "Attempted unauthorized access or reconnaissance.",
             "affected_systems": ["Internal Network", "Authentication Service"],
             "severity": "medium",

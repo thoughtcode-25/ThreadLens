@@ -64,8 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem("forensic_token");
-    localStorage.removeItem("forensic_auth_user");
+    try {
+      localStorage.removeItem("forensic_token");
+      localStorage.removeItem("forensic_auth_user");
+    } catch {}
+    window.location.href = "/login";
   };
 
   return (

@@ -1,4 +1,5 @@
 import os
+import json
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, PyMongoError
@@ -11,9 +12,112 @@ _client = None
 _db = None
 _is_mock = False
 
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+
 
 def get_mongodb_uri() -> str:
-    return os.environ.get("MONGODB_URI", "").strip()
+    uri = os.environ.get("MONGODB_URI", "").strip()
+    # Handle accidental angle brackets in URI if present
+    if "<" in uri or ">" in uri:
+        uri = uri.replace("<", "").replace(">", "")
+    return uri
+
+
+class PersistentMockCollection:
+    """Wraps a mongomock collection to persist documents to disk on every modification."""
+
+    def __init__(self, raw_collection, collection_name: str):
+        self._col = raw_collection
+        self._name = collection_name
+        self._file_path = os.path.join(DATA_DIR, f"{collection_name}.json")
+        self._load_from_disk()
+
+    def _load_from_disk(self):
+        try:
+            if os.path.exists(self._file_path):
+                with open(self._file_path, "r", encoding="utf-8") as f:
+                    docs = json.load(f)
+                if isinstance(docs, list) and len(docs) > 0:
+                    for doc in docs:
+                        try:
+                            self._col.insert_one(doc)
+                        except Exception:
+                            pass
+        except Exception as e:
+            print(f"[WARN] Could not load collection {self._name} from disk: {e}")
+
+    def _save_to_disk(self):
+        try:
+            os.makedirs(DATA_DIR, exist_ok=True)
+            docs = list(self._col.find({}))
+            with open(self._file_path, "w", encoding="utf-8") as f:
+                json.dump(docs, f, indent=2, default=str)
+        except Exception as e:
+            print(f"[WARN] Could not persist collection {self._name} to disk: {e}")
+
+    def insert_one(self, *args, **kwargs):
+        res = self._col.insert_one(*args, **kwargs)
+        self._save_to_disk()
+        return res
+
+    def insert_many(self, *args, **kwargs):
+        res = self._col.insert_many(*args, **kwargs)
+        self._save_to_disk()
+        return res
+
+    def update_one(self, *args, **kwargs):
+        res = self._col.update_one(*args, **kwargs)
+        self._save_to_disk()
+        return res
+
+    def update_many(self, *args, **kwargs):
+        res = self._col.update_many(*args, **kwargs)
+        self._save_to_disk()
+        return res
+
+    def delete_one(self, *args, **kwargs):
+        res = self._col.delete_one(*args, **kwargs)
+        self._save_to_disk()
+        return res
+
+    def delete_many(self, *args, **kwargs):
+        res = self._col.delete_many(*args, **kwargs)
+        self._save_to_disk()
+        return res
+
+    def find(self, *args, **kwargs):
+        return self._col.find(*args, **kwargs)
+
+    def find_one(self, *args, **kwargs):
+        return self._col.find_one(*args, **kwargs)
+
+    def count_documents(self, *args, **kwargs):
+        return self._col.count_documents(*args, **kwargs)
+
+    def create_index(self, *args, **kwargs):
+        try:
+            return self._col.create_index(*args, **kwargs)
+        except Exception:
+            return None
+
+    def __getattr__(self, name):
+        return getattr(self._col, name)
+
+
+class PersistentMockDatabase:
+    """Wraps mongomock database to wrap every accessed collection in PersistentMockCollection."""
+
+    def __init__(self, raw_db):
+        self._raw_db = raw_db
+        self._wrapped_collections = {}
+
+    def __getitem__(self, name: str):
+        if name not in self._wrapped_collections:
+            self._wrapped_collections[name] = PersistentMockCollection(self._raw_db[name], name)
+        return self._wrapped_collections[name]
+
+    def __getattr__(self, name):
+        return self[name]
 
 
 def get_db():
@@ -22,31 +126,32 @@ def get_db():
         return _db
 
     uri = get_mongodb_uri()
-    
+
     # Try connecting to real MongoDB first
     if uri:
         try:
-            client = MongoClient(uri, serverSelectionTimeoutMS=1500)
+            client = MongoClient(uri, serverSelectionTimeoutMS=2000)
             client.admin.command("ping")
             _client = client
             try:
                 _db = _client.get_default_database(default="llm_forensic")
             except Exception:
                 _db = _client["llm_forensic"]
-            print("[INFO] Connected to MongoDB server successfully.")
+            print("[INFO] Connected to MongoDB Atlas/server successfully.")
         except Exception as e:
-            print(f"[INFO] Real MongoDB server at {uri} unavailable ({e}). Falling back to local embedded database.")
+            print(f"[INFO] Remote MongoDB server unavailable ({e}). Initializing persistent local database.")
             _client = None
             _db = None
 
-    # Fallback to local in-memory/embedded MongoDB mock
+    # Fallback to local persistent MongoDB mock (persists to backend/data/*.json)
     if _db is None:
         try:
             import mongomock
-            _client = mongomock.MongoClient()
-            _db = _client["llm_forensic"]
+            raw_client = mongomock.MongoClient()
+            raw_db = raw_client["llm_forensic"]
+            _db = PersistentMockDatabase(raw_db)
             _is_mock = True
-            print("[INFO] Using local embedded database (mongomock). All features are fully functional!")
+            print("[INFO] Using persistent local database (backed by backend/data/). User accounts, sessions, and logs will be permanently saved on disk!")
         except Exception as exc:
             raise RuntimeError(f"Could not connect to MongoDB or initialize local fallback: {exc}")
 
@@ -54,6 +159,8 @@ def get_db():
         _db["logs"].create_index([("timestamp", -1)])
         _db["alerts"].create_index([("timestamp", -1)])
         _db["sessions"].create_index([("created_at", -1)])
+        _db["chat_sessions"].create_index([("updated_at", -1)])
+        _db["users"].create_index([("email", 1)])
     except Exception as exc:
         print(f"[WARN] Failed to create database indexes: {exc}")
 
@@ -69,5 +176,3 @@ def ping_db() -> bool:
         return True
     except Exception:
         return False
-
-
