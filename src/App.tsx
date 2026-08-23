@@ -18,6 +18,7 @@ import AskAi from "./pages/AskAi.tsx";
 import SettingsPage from "./pages/SettingsPage.tsx";
 import ProfilePage from "./pages/ProfilePage.tsx";
 import ReportPage from "./pages/ReportPage.tsx";
+import PricingPage from "./pages/PricingPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ function AppRoutes() {
       <Route path="/" element={isAuthenticated ? <Home /> : <LandingPage />} />
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/security" element={<LandingPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/signup" element={isAuthenticated ? <Navigate to="/" replace /> : <Signup />} />
       <Route path="/verify-email" element={<VerifyEmail />} />

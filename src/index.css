@@ -6,58 +6,59 @@
 
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 92%;
+    /* ── Microsoft Sentinel / Splunk Enterprise Theme ── */
+    --background: 222 47% 11%;          /* #0f172a Slate-900 / Azure Dark */
+    --foreground: 210 40% 98%;          /* #f8fafc Crisp High-Contrast White */
 
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 92%;
+    --card: 217 33% 17%;                /* #1e293b Slate-800 Elevated Surface */
+    --card-foreground: 210 40% 98%;
 
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 92%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 250 80% 65%;
+    --primary: 217 91% 60%;             /* #3b82f6 Azure Security / Sentinel Blue */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 50% 15%;
-    --secondary-foreground: 210 40% 92%;
+    --secondary: 217 24% 24%;           /* #2e384d Slate-700 */
+    --secondary-foreground: 210 35% 92%;
 
-    --muted: 215 40% 14%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 217 28% 18%;               /* #212c40 */
+    --muted-foreground: 215 20% 70%;    /* #94a3b8 Slate-400 */
 
-    --accent: 190 95% 50%;
-    --accent-foreground: 222 47% 6%;
+    --accent: 192 95% 48%;              /* #06b6d4 Splunk & Sentinel Cyber Cyan */
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 72% 55%;
+    --destructive: 0 84% 60%;           /* #ef4444 Sentinel Alert Red */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 30% 18%;
-    --input: 215 30% 18%;
-    --ring: 250 80% 65%;
+    --border: 217 20% 28%;              /* #38455a Crisp Structural Borders */
+    --input: 217 24% 22%;
+    --ring: 217 91% 60%;
 
     --radius: 0.75rem;
 
-    --threat-high: 0 72% 55%;
-    --threat-medium: 38 92% 55%;
-    --threat-low: 142 70% 45%;
-    --safe: 142 70% 45%;
+    --threat-high: 0 84% 60%;
+    --threat-medium: 38 92% 50%;
+    --threat-low: 152 68% 46%;
+    --safe: 152 68% 46%;
 
-    --glow-primary: 0 0 20px hsl(250 80% 65% / 0.3);
-    --glow-accent: 0 0 20px hsl(190 95% 50% / 0.3);
-    --glow-danger: 0 0 20px hsl(0 72% 55% / 0.4);
-    --glow-warning: 0 0 20px hsl(38 92% 55% / 0.3);
-    --glow-safe: 0 0 20px hsl(142 70% 45% / 0.3);
+    --glow-primary: 0 0 20px hsl(217 91% 60% / 0.35);
+    --glow-accent: 0 0 20px hsl(192 95% 48% / 0.35);
+    --glow-danger: 0 0 20px hsl(0 84% 60% / 0.4);
+    --glow-warning: 0 0 20px hsl(38 92% 50% / 0.35);
+    --glow-safe: 0 0 20px hsl(152 68% 46% / 0.35);
 
-    --glass-bg: hsl(222 47% 9% / 0.6);
-    --glass-border: hsl(215 30% 25% / 0.4);
+    --glass-bg: hsl(217 33% 17% / 0.9);
+    --glass-border: hsl(217 20% 32% / 0.6);
 
-    --sidebar-background: 222 47% 7%;
-    --sidebar-foreground: 210 40% 75%;
-    --sidebar-primary: 250 80% 65%;
+    --sidebar-background: 222 38% 13%;   /* #131c2e Sentinel Workspace Nav */
+    --sidebar-foreground: 215 20% 78%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 50% 15%;
-    --sidebar-accent-foreground: 210 40% 92%;
-    --sidebar-border: 215 30% 15%;
-    --sidebar-ring: 250 80% 65%;
+    --sidebar-accent: 217 28% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 20% 22%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Home, LayoutDashboard, Activity, Search, History, Bot,
   Settings, Shield, LogOut, User, ChevronUp, Lock, Unlock, Pin, PinOff,
+  Sparkles, CreditCard,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,6 +51,7 @@ const navGroups: NavGroup[] = [
 ];
 
 const bottomItems: NavItem[] = [
+  { title: "Pricing & Plans", url: "/pricing", icon: Sparkles },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

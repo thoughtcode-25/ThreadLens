@@ -47,15 +47,15 @@ const CyberBackground = () => {
       vx: (Math.random() - 0.5) * 0.22,
       vy: (Math.random() - 0.5) * 0.22,
       r: 1.4 + Math.random() * 1.6,
-      hue: Math.random() < 0.55 ? 255 : 190, // purple or cyan
+      hue: Math.random() < 0.6 ? 212 : 192, // Azure Blue (212) or Sentinel Cyan (192)
     }));
 
-    // ── Static ambient glows (corners) ───────────────────────
+    // ── Static ambient glows (Sentinel Blue & Splunk Cyan) ──────
     const glows = [
-      { x: 0.12,  y: 0.10, r: 0.28, color: [88, 50, 200]  },
-      { x: 0.88,  y: 0.85, r: 0.22, color: [20, 180, 230]  },
-      { x: 0.85,  y: 0.08, r: 0.18, color: [100, 60, 210]  },
-      { x: 0.10,  y: 0.88, r: 0.16, color: [30, 160, 220]  },
+      { x: 0.12,  y: 0.10, r: 0.32, color: [0, 120, 212]   }, // Microsoft Azure Blue
+      { x: 0.88,  y: 0.85, r: 0.26, color: [6, 182, 212]   }, // Splunk Cyan
+      { x: 0.85,  y: 0.08, r: 0.20, color: [59, 130, 246]  }, // Sentinel Blue
+      { x: 0.10,  y: 0.88, r: 0.18, color: [14, 165, 233]  }, // Sky Blue
     ];
 
     let frame = 0;
@@ -67,10 +67,10 @@ const CyberBackground = () => {
 
       // solid fill on frame 1 then semi-transparent trail
       if (frame === 1) {
-        ctx.fillStyle = "#080a14";
+        ctx.fillStyle = "#0f172a";
         ctx.fillRect(0, 0, W, H);
       }
-      ctx.fillStyle = "rgba(8,10,20,0.22)";
+      ctx.fillStyle = "rgba(15, 23, 42, 0.28)";
       ctx.fillRect(0, 0, W, H);
 
       // ── Ambient radial glows (static, redrawn each frame) ──
@@ -79,7 +79,7 @@ const CyberBackground = () => {
         const gy = g.y * H;
         const gr = g.r * Math.min(W, H);
         const grd = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-        grd.addColorStop(0, `rgba(${g.color[0]},${g.color[1]},${g.color[2]},0.055)`);
+        grd.addColorStop(0, `rgba(${g.color[0]},${g.color[1]},${g.color[2]},0.07)`);
         grd.addColorStop(1, `rgba(${g.color[0]},${g.color[1]},${g.color[2]},0)`);
         ctx.fillStyle = grd;
         ctx.fillRect(0, 0, W, H);
@@ -87,7 +87,7 @@ const CyberBackground = () => {
 
       // ── Dot grid ──────────────────────────────────────────
       const GRID = 44;
-      ctx.fillStyle = "rgba(110,100,220,0.09)";
+      ctx.fillStyle = "rgba(56, 189, 248, 0.07)";
       for (let gx = GRID / 2; gx < W; gx += GRID) {
         for (let gy = GRID / 2; gy < H; gy += GRID) {
           ctx.beginPath();
@@ -96,18 +96,18 @@ const CyberBackground = () => {
         }
       }
 
-      // ── Sparse matrix rain ────────────────────────────────
+      // ── Sparse matrix rain / Telemetry stream ─────────────
       ctx.font = "12px 'JetBrains Mono', 'Courier New', monospace";
       for (const d of drops) {
         const x = d.col * COL_W;
         const y = d.y * 16;
         // lead char — brighter
         const alpha = d.opacity;
-        ctx.fillStyle = `rgba(34,211,238,${alpha})`;
+        ctx.fillStyle = `rgba(6, 182, 212, ${alpha})`;
         ctx.fillText(CHAR_SET[Math.floor(Math.random() * CHAR_SET.length)], x, y);
         // one ghost char above
         if (d.y > 3) {
-          ctx.fillStyle = `rgba(120,80,255,${alpha * 0.45})`;
+          ctx.fillStyle = `rgba(59, 130, 246, ${alpha * 0.45})`;
           ctx.fillText(CHAR_SET[Math.floor(Math.random() * CHAR_SET.length)], x, y - 16);
         }
         d.y += d.speed;
@@ -134,8 +134,8 @@ const CyberBackground = () => {
           const dy = nodes[i].y - nodes[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < EDGE_DIST) {
-            const a = (1 - dist / EDGE_DIST) * 0.14;
-            ctx.strokeStyle = `rgba(120,80,255,${a})`;
+            const a = (1 - dist / EDGE_DIST) * 0.16;
+            ctx.strokeStyle = `rgba(59, 130, 246, ${a})`;
             ctx.lineWidth = 0.7;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
@@ -148,9 +148,9 @@ const CyberBackground = () => {
       // dots
       for (const nd of nodes) {
         const grd = ctx.createRadialGradient(nd.x, nd.y, 0, nd.x, nd.y, nd.r * 4);
-        const isC = nd.hue === 190;
-        grd.addColorStop(0, isC ? "rgba(34,211,238,0.7)"  : "rgba(120,80,255,0.7)");
-        grd.addColorStop(1, isC ? "rgba(34,211,238,0)"    : "rgba(120,80,255,0)");
+        const isC = nd.hue === 192;
+        grd.addColorStop(0, isC ? "rgba(6, 182, 212, 0.75)"  : "rgba(59, 130, 246, 0.75)");
+        grd.addColorStop(1, isC ? "rgba(6, 182, 212, 0)"     : "rgba(59, 130, 246, 0)");
         ctx.fillStyle = grd;
         ctx.beginPath();
         ctx.arc(nd.x, nd.y, nd.r * 4, 0, Math.PI * 2);

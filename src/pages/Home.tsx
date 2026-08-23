@@ -5,7 +5,7 @@ import {
   Upload, Activity, Bot, Send, Zap, ChevronRight,
   Image as ImageIcon, X, FileText,
   LayoutDashboard, LogOut, User, History, Settings,
-  Shield, ChevronUp,
+  Shield, ChevronUp, Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -56,6 +56,7 @@ const navGroups: NavGroup[] = [
 ];
 
 const bottomNavItems: NavItem[] = [
+  { title: "Pricing & Plans", url: "/pricing", icon: Sparkles },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
