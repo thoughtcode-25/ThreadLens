@@ -1,0 +1,26 @@
+[
+  {
+    "type": "Brute Force Attack",
+    "ip": "unknown",
+    "risk": "high",
+    "timestamp": "2024-08-22T10:36:19",
+    "description": "32 failed login attempts detected from unknown",
+    "resolved": false,
+    "title": "Brute Force Attack Detected",
+    "_id": "aa3e121f-79df-4c0d-8800-093c7a25e10b",
+    "created_at": "2026-08-23T06:13:06.812096",
+    "owner": "anonymous"
+  },
+  {
+    "type": "Unusual Activity",
+    "ip": "unknown",
+    "risk": "medium",
+    "timestamp": "2026-02-20T00:28:19",
+    "description": "Login attempt at unusual hour (00:xx) from unknown",
+    "resolved": false,
+    "title": "Unusual Hour Login",
+    "_id": "0869012e-4cdb-41f1-8641-6634dd6ba45e",
+    "created_at": "2026-08-23T06:13:06.812096",
+    "owner": "anonymous"
+  }
+]

@@ -512,21 +512,22 @@ def _gen_live_log():
 
 
 @app.get("/api/live-logs")
-def live_logs(request: Request, count: int = Query(10, le=50)):
+def live_logs(request: Request, count: int = Query(10, le=50), source: str = Query("simulated")):
+    if source == "db":
+        try:
+            db = get_db()
+            owner = get_owner(request)
+            user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
+            real = list(db["logs"].find(user_filter, {"_id": 1, "timestamp": 1, "ip": 1, "event": 1,
+                                              "suspicious": 1, "level": 1, "status": 1, "risk": 1})
+                        .sort("ingested_at", -1).limit(count))
+            for d in real:
+                d["id"] = str(d.pop("_id"))
+            if real:
+                return {"logs": real}
+        except Exception:
+            pass
     logs = [_gen_live_log() for _ in range(count)]
-    try:
-        db = get_db()
-        owner = get_owner(request)
-        user_filter = {"$or": [{"owner": owner}, {"user_email": owner}]} if owner != "anonymous" else {}
-        real = list(db["logs"].find(user_filter, {"_id": 1, "timestamp": 1, "ip": 1, "event": 1,
-                                          "suspicious": 1, "level": 1, "status": 1, "risk": 1})
-                    .sort("ingested_at", -1).limit(count))
-        for d in real:
-            d["id"] = d.pop("_id")
-        if real:
-            return {"logs": real}
-    except Exception:
-        pass
     return {"logs": logs}
 
 

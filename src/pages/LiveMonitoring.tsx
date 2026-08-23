@@ -1,13 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { LiveLogsPanel } from "@/components/dashboard/LiveLogsPanel";
-import { Activity, Play, Square, Zap, Plug, AlertCircle } from "lucide-react";
+import { Activity, Play, Square, Zap, Plug, AlertCircle, Clock } from "lucide-react";
 
 const LiveMonitoring = () => {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [mode, setMode] = useState<"demo" | "api">("demo");
   const [apiEndpoint, setApiEndpoint] = useState("");
   const [endpointError, setEndpointError] = useState("");
+  const [sessionSeconds, setSessionSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isMonitoring) {
+      setSessionSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setSessionSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isMonitoring]);
+
+  const formatDuration = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(mins).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
 
   const handleStart = () => {
     if (mode === "api") {
@@ -21,6 +39,7 @@ const LiveMonitoring = () => {
       }
     }
     setEndpointError("");
+    setSessionSeconds(0);
     setIsMonitoring(true);
   };
 
@@ -38,16 +57,22 @@ const LiveMonitoring = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-foreground">Live Monitoring</h2>
-              <p className="text-sm text-muted-foreground">Real-time log stream analysis</p>
+              <p className="text-sm text-muted-foreground">Real-time continuous log stream analysis</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {isMonitoring && (
-              <span className="flex items-center gap-2 text-xs text-safe bg-safe/10 border border-safe/20 rounded-full px-3 py-1.5">
-                <span className="w-2 h-2 rounded-full bg-safe pulse-dot" />
-                {mode === "demo" ? "Demo Mode" : "Streaming Active"}
-              </span>
+              <>
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground bg-card border border-border rounded-full px-3 py-1.5 font-mono">
+                  <Clock className="w-3.5 h-3.5 text-accent" />
+                  Duration: {formatDuration(sessionSeconds)}
+                </span>
+                <span className="flex items-center gap-2 text-xs text-safe bg-safe/10 border border-safe/20 rounded-full px-3 py-1.5">
+                  <span className="w-2 h-2 rounded-full bg-safe pulse-dot" />
+                  {mode === "demo" ? "Continuous Demo Mode Active" : "API Streaming Active"}
+                </span>
+              </>
             )}
           </div>
         </div>
@@ -134,7 +159,7 @@ const LiveMonitoring = () => {
                 Stop Monitoring
               </button>
             </div>
-            <LiveLogsPanel isActive={true} />
+            <LiveLogsPanel isActive={true} mode={mode} apiEndpoint={apiEndpoint} />
           </div>
         )}
 

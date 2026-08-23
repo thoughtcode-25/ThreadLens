@@ -34,49 +34,105 @@ export interface ChatMessage {
 }
 
 const events = [
-  "SSH login attempt",
-  "Failed authentication",
-  "Port scan detected",
-  "Firewall rule triggered",
-  "Suspicious outbound connection",
-  "Privilege escalation attempt",
-  "Brute force detected",
-  "Malware signature match",
-  "DNS tunneling suspected",
-  "Unauthorized file access",
-  "Normal HTTP request",
-  "Database query executed",
-  "User session created",
-  "Config file modified",
-  "Service restarted",
-  "Backup completed",
-  "Certificate renewed",
-  "API rate limit warning",
+  // High-severity Attacks & Suspicious
+  "SSH login attempt (invalid user 'root')",
+  "SSH brute force detected (>50 attempts/min)",
+  "Failed authentication for user 'admin'",
+  "Port scan detected (SYN sweep ports 1-1024)",
+  "Firewall rule triggered: DROP inbound to port 445",
+  "Suspicious outbound C2 beacon to 91.219.236.222:4444",
+  "Privilege escalation attempt: sudo su without auth",
+  "SQL Injection detected: SELECT * FROM users WHERE '1'='1'",
+  "Cross-Site Scripting (XSS) detected in GET /search",
+  "Malware signature match: Trojan.Generic.KDZ",
+  "DNS tunneling data exfiltration suspected (subdomain queries)",
+  "Unauthorized file access attempt: /etc/shadow",
+  "Directory traversal attempt: ../../../../etc/passwd",
+  "DDoS SYN flood anomaly: 12,000 pkts/sec on port 443",
+  "Reverse TCP shell connection initiated",
+  "Ransomware file encryption activity detected in /var/data",
+
+  // Normal / Operational
+  "Normal HTTP GET /api/v1/health 200 OK",
+  "Normal HTTP POST /api/auth/token 200 OK",
+  "Database query executed: SELECT count(*) FROM metrics",
+  "User session created for user 'operator_1'",
+  "Config file modified: /etc/nginx/nginx.conf by admin",
+  "System service restarted: systemd-journald.service",
+  "Automated backup completed successfully (4.2 GB)",
+  "TLS certificate renewed for *.internal.corp",
+  "API rate limit warning: 85% of quota used on /api/v2/stream",
+  "Kubernetes pod health probe check passed",
+  "Outbound HTTPS request to api.github.com 200 OK",
+  "DHCP lease renewed for 192.168.1.145",
 ];
 
 const ips = [
-  "192.168.1.105", "10.0.0.42", "172.16.0.88", "45.33.32.156",
-  "203.0.113.50", "198.51.100.23", "192.0.2.1", "185.220.101.34",
-  "91.219.236.222", "178.128.0.12",
+  "185.220.101.34", "91.219.236.222", "178.128.0.12", "45.33.32.156",
+  "103.251.167.20", "194.26.29.112", "198.51.100.23", "203.0.113.50",
+  "192.168.1.105", "10.0.0.42", "172.16.0.88", "192.0.2.1",
+  "10.244.0.15", "172.20.10.4", "192.168.0.254",
 ];
 
-const suspiciousEvents = new Set([
-  "Port scan detected", "Suspicious outbound connection",
-  "Privilege escalation attempt", "Brute force detected",
-  "Malware signature match", "DNS tunneling suspected",
-  "Failed authentication",
-]);
+const suspiciousKeywords = [
+  "SSH brute force", "Port scan", "Suspicious outbound", "Privilege escalation",
+  "SQL Injection", "XSS", "Malware", "DNS tunneling", "Unauthorized file",
+  "Directory traversal", "DDoS", "Reverse TCP shell", "Ransomware", "Failed authentication",
+];
+
+function isEventSuspicious(eventStr: string): boolean {
+  return suspiciousKeywords.some((kw) => eventStr.includes(kw));
+}
+
+function formatCurrentTimestamp(offsetSeconds = 0): string {
+  const d = new Date(Date.now() - offsetSeconds * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+export function generateLiveLogEntry(idSuffix?: number | string) {
+  const event = events[Math.floor(Math.random() * events.length)];
+  const isSuspicious = isEventSuspicious(event);
+  const ip = ips[Math.floor(Math.random() * ips.length)];
+  const uniqueId = `live-${Date.now()}-${idSuffix ?? Math.random().toString(36).substring(2, 7)}`;
+
+  let level: "info" | "warning" | "error" | "critical" = "info";
+  let risk: "low" | "medium" | "high" = "low";
+  let status: "success" | "failed" | "blocked" = "success";
+
+  if (isSuspicious) {
+    const isCritical = event.includes("Ransomware") || event.includes("Reverse TCP") || event.includes("Malware") || event.includes("SQL Injection");
+    level = isCritical ? "critical" : (Math.random() > 0.4 ? "error" : "warning");
+    risk = isCritical || Math.random() > 0.5 ? "high" : "medium";
+    status = Math.random() > 0.3 ? "failed" : "blocked";
+  } else {
+    level = event.includes("warning") ? "warning" : (Math.random() > 0.9 ? "warning" : "info");
+    risk = "low";
+    status = "success";
+  }
+
+  return {
+    id: uniqueId,
+    timestamp: formatCurrentTimestamp(0),
+    ip,
+    event,
+    level,
+    suspicious: isSuspicious,
+    status,
+    risk,
+    raw: `[${formatCurrentTimestamp(0)}] ${ip} -> ${event} [status=${status}, risk=${risk}]`,
+  };
+}
 
 export function generateLogEntry(index: number): LogEntry {
   const event = events[Math.floor(Math.random() * events.length)];
-  const isSuspicious = suspiciousEvents.has(event);
-  const now = new Date();
-  now.setSeconds(now.getSeconds() - index * Math.floor(Math.random() * 5 + 1));
+  const isSuspicious = isEventSuspicious(event);
+  const ip = ips[Math.floor(Math.random() * ips.length)];
 
   return {
     id: `log-${Date.now()}-${index}`,
-    timestamp: now.toISOString().replace("T", " ").substring(0, 19),
-    ip: ips[Math.floor(Math.random() * ips.length)],
+    timestamp: formatCurrentTimestamp(index * Math.floor(Math.random() * 4 + 1)),
+    ip,
     event,
     level: isSuspicious
       ? Math.random() > 0.5 ? "critical" : "error"
