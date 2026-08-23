@@ -792,7 +792,7 @@ export default function PricingPage() {
 
   // If user is unauthenticated, render with top navigation and full landing page theme
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 font-sans selection:bg-primary/30 selection:text-primary relative">
+    <div className="min-h-screen bg-transparent text-slate-100 font-sans selection:bg-primary/30 selection:text-primary relative z-10">
       
       {/* Top Simple Sticky Navbar for standalone view */}
       <header className="sticky top-0 z-40 bg-[#131c2e]/95 backdrop-blur-md border-b border-slate-800 py-3.5">

@@ -124,7 +124,7 @@ export default function LandingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 font-sans selection:bg-primary/30 selection:text-primary relative">
+    <div className="min-h-screen bg-transparent text-slate-100 font-sans selection:bg-primary/30 selection:text-primary relative z-10">
       
       {/* ── 1. TOP ANNOUNCEMENT BAR ── */}
       {showAnnouncement && (
