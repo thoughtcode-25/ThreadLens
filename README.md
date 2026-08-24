@@ -42,19 +42,7 @@ python main.py
 Open http://localhost:5000. The Vite development server proxies `/api`
 requests to the backend at http://localhost:8000.
 
-## Run on Replit
-
-The project includes two workflows:
-
-- **Start application** — Vite frontend on port 5000
-- **Backend API** — FastAPI backend on port 8000
-
-Add `MONGODB_URI`, `GROQ_API_KEY`, and `JWT_SECRET` as Replit Secrets before
-using persistent data or AI features. The frontend and backend can still start
-without those services; the Settings page will show which dependencies are
-unavailable.
-
-## Checks these
+## Checks
 
 ```bash
 npm run build
