@@ -54,7 +54,7 @@ using persistent data or AI features. The frontend and backend can still start
 without those services; the Settings page will show which dependencies are
 unavailable.
 
-## Checks
+## Checks these
 
 ```bash
 npm run build
