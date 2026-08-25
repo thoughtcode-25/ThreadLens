@@ -6,6 +6,11 @@ reporting.
 
 > **Status:** In testing phase. Features, integrations, and data handling may
 > change before the first stable release.
+>
+> ## Author
+
+**Piyush Raj Singh**
+Contact email: [businessthought.code@gmail.com](mailto:businessthought.code@gmail.com)
 
 ## Technology
 
@@ -222,8 +227,3 @@ api/index.py          Vercel Python entry point
 - Use Gmail app passwords for SMTP.
 - Do not expose the local webhook endpoint publicly without authentication and
 	request validation.
-
-## Author
-
-**Piyush Raj Singh**
-Contact email: [businessthought.code@gmail.com](mailto:businessthought.code@gmail.com)
