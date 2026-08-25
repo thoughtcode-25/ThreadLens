@@ -10,7 +10,7 @@ reporting.
 > ## Author
 
 **Piyush Raj Singh**
-Contact email: [businessthought.code@gmail.com](mailto:businessthought.code@gmail.com)
+:Contact email: [businessthought.code@gmail.com](mailto:businessthought.code@gmail.com)
 
 ## Technology
 
